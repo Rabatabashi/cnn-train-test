@@ -8,6 +8,7 @@
 import numpy as np
 
 
+
 class Layer:
 	def __init__(self, layrID, initializationType, layerType, activationType, weightSize):
 		self.layrID = layrID
@@ -25,14 +26,17 @@ class Layer:
 				kernelWidth = weightSize[2]
 				channels = weightSize[3]
 				for kernelIdx in range(numberOfKernels):
-					self.weights[kernelIdx] = np.random.uniform(-1, +1, (kernelHeight, kernelWidth, channels))
-					self.biases[kernelIdx] = np.random.uniform(-1, +1, (1))
-
+					self.weights[kernelIdx] = np.random.uniform(-0.01, +0.01, (kernelHeight, kernelWidth, channels))
+					self.weights[kernelIdx]= self.weights[kernelIdx].astype(dtype=np.float128)
+					self.biases[kernelIdx] = np.random.uniform(-0.01, +0.01, (1))
+					self.biases[kernelIdx]= self.biases[kernelIdx].astype(dtype=np.float128)
 			elif self.layerType == "FullyConnected":
 				lastFeatureMapSize = weightSize[0]	#TODO it must calculate instead of arbitrary give it.
 				numberOfOutPut = weightSize[1]
-				self.weights[0] = np.random.uniform(-1, +1, (lastFeatureMapSize, numberOfOutPut))
-				self.biases[0] = np.random.uniform(-1, +1, (numberOfOutPut))
+				self.weights[0] = np.random.uniform(-0.01, +0.01, (lastFeatureMapSize, numberOfOutPut))
+				self.weights[0]= self.weights[0].astype(dtype=np.float128)
+				self.biases[0] = np.random.uniform(-0.01, +0.01, (numberOfOutPut))
+				self.biases[0]= self.biases[0].astype(dtype=np.float128)
 		else:
 			print("initializationType =", self.initializationType)
 			raise Exception("This initializationType is not defined yet. Only Xavier is allowed.")
@@ -48,6 +52,7 @@ class CNN:
 		numberOfLayers = len(layerTypeList)	#all lists in the arguments of this function have same number of elements.
 		for layer in range(numberOfLayers):
 			self.layers.append(Layer(layer, initializationType, layerTypeList[layer], activationTypeList[layer], weightSizeList[layer]))
+			
 	
 	def __del__(self): 
 		print('Destructor called, CNN deleted.')
@@ -69,7 +74,9 @@ class CNN:
 		#NOTE: WE use one kernel strides, later it will be a parameters too.
 		kernelStride = 1
 		
-		P = np.ceil(((inputFeatureMap * kernelStride) - kernelStride - inputFeatureMap + kernelSizes) / 2)
+		shapeOfFeatureMap = inputFeatureMap.shape
+		
+		P = int(np.ceil(((shapeOfFeatureMap[0] * kernelStride) - kernelStride - shapeOfFeatureMap[0] + kernelSizes) / 2))
 
 		#We return P in thise case it is equal with all parameters (xLeft, xRight, yBot, yTop) of padding. 
 		return P
@@ -85,13 +92,20 @@ class CNN:
 		#inputFeatureMap is a 3D tensor. (input feature map.
 		#Handle different to the opposite sides of the tensor, because the kernel sizes can be even and if the feature map is not even it can be indexing out frominput.
 		#assymetric kernel sizes make it neccessary of the neighboor  sides should be different have different shapes at paadding.
-		(H, W, C) = inputFeatureMap.shape()
+		shapeOfFeatureMap = inputFeatureMap.shape
+		H = shapeOfFeatureMap[0]
+		W = shapeOfFeatureMap[1]
+		C = shapeOfFeatureMap[2]
+		
 		newH = H + yBot + yTop
 		newW = W + xLeft + xRight
-		outputFeatureMap = np.zeros((newH, newW, C))
-		outputFeatureMap[yTop:-yBot, xLeft:-xRight, :]	#WARNING: these function does not handle the batchsize yet.
-
-		return outputFeatureMap
+		outputFeatureMap = np.zeros((newH, newW, C), dtype=np.float128)
+		outputFeatureMap[yTop:-yBot, xLeft:-xRight, :] = inputFeatureMap	#WARNING: these function does not handle the batchsize yet.
+		
+		cache = padding
+		
+		return outputFeatureMap, cache
+	
 
 ########################################################################################################################
 ##Conv and FC
@@ -101,12 +115,12 @@ class CNN:
 		(fH,fW,fC) = self.layers[layerID].weights[0].shape
 		
 		#Feature map sizes
-		outputDepth = len(self.layers[layerID])
+		outputDepth = len(self.layers[layerID].weights)
 		(inputWidth, inputHeight, inputChannels) = inputFeatureMap.shape
 		outputHeight = inputHeight - fH + 1
 		outputWidth = inputWidth - fW + 1
 		
-		outputFeatureMap = np.zeros((outputHeight, outputWidth, outputDepth))
+		outputFeatureMap = np.zeros((outputHeight, outputWidth, outputDepth), dtype=np.float128)
 		
 		for kernelIdx in range(outputDepth):
 			for h in range(outputHeight):
@@ -120,7 +134,7 @@ class CNN:
 		return outputFeatureMap, cache
 
 	#Backward convoltuion
-	def backwardConvoltuion(self, layerID, delta, cache, xShape=None):
+	def backwardConvolution(self, layerID, delta, cache):
 		
 		#Stored feature map
 		X = cache["X"]
@@ -129,35 +143,37 @@ class CNN:
 		W = cache["Weights"]
 		
 		#shape (H,W,C) of input
-		(Hprev, Wprev, Cprev) = X.shape
-		
+		#(Hprev, Wprev, Cprev) = X.shape
+
 		#shape (H,W,C) of a weight kernel
-		(fH, fW, fC) = W[0].shape
-		
-		#shape of the output feature map. This is the backpropagated error tensor.
-		#It contain the error of next feature map and the derivates of the nonlinearity(wrt the logits)
-		if not (xShape is None):
-			#if the delta come from a fully connected it is a 1D vector
-			#Reshape it into 3D tensor
-			delta.reshape=(xShape)
-			(Hcurr, Wcurr, Ccurr) = delta.shape
-		else:
-			#The delta come from convoluton
-			(Hcurr, Wcurr, Ccurr) = delta.shape
+		#(fH, fW, fC) = W[0].shape
+		shapeOfAWeightKernel = W[0].shape
+		#dim = len(shapeOfAWeightKernel)
+		#print(dim)
+		fH = shapeOfAWeightKernel[0]
+		fW = shapeOfAWeightKernel[1]
+		#fC = shapeOfAWeightKernel[2]
+
+		#NOTE: NN = N and CC = C, because pool decrease only the width and height of feature map
+		#NN, HH, WW, CC = delta.shape()
+		deltaShape = delta.shape
+		Hcurr = deltaShape[0]
+		Wcurr = deltaShape[1]
+		CC = deltaShape[2]
 		
 		#These list will be store the derivates of the weights and biases.
 		dWList = []
 		dBList = []
 		
-		dX = np.zeros(X.shape)
+		dX = np.zeros(X.shape, dtype=np.float128)
 		
 		#Feature map sizes
-		countOfKernels = len(self.layers[layerID])
+		countOfKernels = len(self.layers[layerID].weights)
 		for kernelIdx in range(countOfKernels):
 			#dE/dW
-			dW = np.zeros(self.layers[layerID].weights[kernelIdx].shape)	#NOTE: If all kernels are same this line can goto out from this for cycle.
+			dW = np.zeros_like(self.layers[layerID].weights[kernelIdx], dtype=np.float128)	#NOTE: If all kernels are same this line can goto out from this for cycle.
 			#dE/dB
-			dB = np.zeros(self.layers[layerID].biases[kernelIdx].shape)	#NOTE: If all kernels are same this line can goto out from this for cycle.
+			dB = np.zeros_like(self.layers[layerID].biases[kernelIdx], dtype=np.float128)	#NOTE: If all kernels are same this line can goto out from this for cycle.
 			for h in range(Hcurr):
 				for w in range(Wcurr):
 					dX[h:h+fH, w:w+fW, :] += W[kernelIdx] * delta[h,w,kernelIdx]
@@ -177,14 +193,13 @@ class CNN:
 		#.flatten() do it if inputFeatureMap is a numpy.array
 		X = inputFeatureMap.copy()
 		xShape = X.shape
-		X.flatten()
+		#X.flatten()
+		X = np.reshape(X, (xShape[0] * xShape[1] * xShape[2]))
 
-		(countOfActivation, countOfClasses) = self.layer[layerID].weights[0].shape
-		
-		outputVector = [None] * countOfClasses
-		for cls in range(countOfClasses):
-			for act in range(countOfActivation):
-				outputVector[cls] += np.add(np.multiply(X, self.layers[layerID].weights[0]), self.layers[layerID].biases[0])
+
+		(countOfActivation, countOfClasses) = self.layers[layerID].weights[0].shape
+
+		outputVector = np.add(np.matmul(X, self.layers[layerID].weights[0]), self.layers[layerID].biases[0])
 		
 		#for backpropagation we need the X and W tensors
 		cache = (X, xShape, self.layers[layerID].weights.copy(), self.layers[layerID].biases.copy())
@@ -196,29 +211,23 @@ class CNN:
 		
 		#Stored feature map (it is an 1D)
 		X = cache["X"]
-		#The shape of X befor flatten() xShape = (H,W,C)
-		xShape = cache["Shape"]
 		#Stored wights
 		W = cache["Weights"]
-		
-		#shape (H,W,C) of input
-		(Hprev, Wprev, Cprev) = xShape
-		
-		#shape (activation_pixels, output_classes) of a weight kernel
-		(inputCount, outputCount) = W[0].shape
-		
-		#shape of the output feature map. This is the backpropagated error tensor.
-		#It contain the error of next feature map and the derivates of the nonlinearity(wrt the logits)
-		(Hcurr, Wcurr, Ccurr) = delta.shape
 		
 		#These list will be store the derivates of the weights and biases.
 		dWList = []
 		dBList = []
 		
-		#Feature map sizes
-		countOfKernels = len(self.layers[layerID])
+		dW = np.outer(X, delta)
+		dW= dW.astype(dtype=np.float128)
+		dB = delta
+		dB= dB.astype(dtype=np.float128)
 		
-		dX 
+		dX = np.dot(W[0], delta)
+		dX= dX.astype(dtype=np.float128)
+		
+		dWList.append(dW)
+		dBList.append(dB)
 		
 		return dX, dWList, dBList
 
@@ -228,7 +237,8 @@ class CNN:
 	#add biases to the input all elements
 	def doBiasAddOnLayer(self, inputFeatureMap, layerID):
 		#Feature map sizes
-		outputDepth = len(self.layers[layerID])
+		outputFeatureMap = np.zeros_like(inputFeatureMap, dtype=np.float128)
+		outputDepth = len(self.layers[layerID].biases)
 		for kernelIdx in range(outputDepth):
 			outputFeatureMap[:,:,kernelIdx] = inputFeatureMap[:,:,kernelIdx] + self.layers[layerID].biases[kernelIdx]
 		
@@ -240,8 +250,34 @@ class CNN:
     
     
 ##Activations(/Nonlinearities) and their derivates (derivates are neccessary during backpropagation).
-    #This function return the selected activation function.
-    #It is called in activationFunction() function.
+	
+	#TRY
+	def alternativeActivationFunction(self, name, X):
+		if(name == "sigmoid"):
+			y = np.copy(X)
+			results = np.exp(y)/(1+np.exp(y))
+			return results
+		elif(name == "linear"):
+			return X
+		elif(name == "relu"):
+			y = np.copy(X)
+			y[y<0] = 0
+			return y
+		elif(name == "softmax"):
+			xx = np.copy(x)
+			y = np.exp(xx) / np.sum(np.exp(xx))
+			return y
+		else:
+			print('Unknown activation function. linear is used')
+			return lambda x: x
+		return
+	
+	
+	
+	
+	
+	#This function return the selected activation function.
+	#It is called in activationFunction() function.
 	def getActivationFunction(self, name):
 		if(name == "sigmoid"):
 			return lambda x : np.exp(x)/(1+np.exp(x))
@@ -273,7 +309,9 @@ class CNN:
 		
 		#Use activation function on input feature map
 		outputFeatureMap = activationFunction(inputFeatureMap)
-
+		
+		##outputFeatureMap = self.alternativeActivationFunction(typeOfNonlinearity, inputFeatureMap)
+		
 		return outputFeatureMap
     
     
@@ -311,15 +349,17 @@ class CNN:
 
 		return outputFeatureMap
 	
-	
+
 ########################################################################################################################
 #Poolings
 	#Max-pooling layer - reduce the height and width of feature map, (select the maximal activity in the kernel slices)
 	def doMaxPoolingOnlayer(self, inputFeatureMap, kernelHeight, kernelWidth, strideY, strideX):
 		(inputWidth, inputHeight, inputChannels) = inputFeatureMap.shape
 		#determine the output resolution after pooling
-		outputHeight = np.ceil((inputHeight - kernelHeight) / strideY) + 1
-		outputWidth = np.ceil((inputWidth - kernelWidth) / strideX) + 1
+		outputHeight = int(np.ceil((inputHeight - kernelHeight) / strideY) + 1)
+		outputWidth = int(np.ceil((inputWidth - kernelWidth) / strideX) + 1)
+		
+		outputFeatureMap = np.zeros((outputHeight, outputWidth, inputChannels), dtype=np.float128)
 		
 		for c in range(inputChannels):
 			for h in range(outputHeight):
@@ -339,44 +379,87 @@ class CNN:
 
 	#It is a naive implementation of backward pooling based on:
 	#https://leonardoaraujosantos.gitbooks.io/artificial-inteligence/content/pooling_layer.html
-	def doMaxPoolingOnlayerBackWard(self, pooledDeltaX, cache):
+	def doMaxPoolingOnlayerBackWard(self, pooledDeltaX, cache, xShape=None):
+		
+		#shape of the output feature map. This is the backpropagated error tensor.
+		#It contain the error of next feature map and the derivates of the nonlinearity(wrt the logits)
+		if not (xShape is None):
+			#if the delta come from a fully connected it is a 1D vector
+			#Reshape it into 3D tensor
+			pooledDeltaX = np.reshape(pooledDeltaX, (xShape))
+			#(Hcurr, Wcurr, Ccurr) = delta.shape
+			#NOTE: NN = N and CC = C, because pool decrease only the width and height of feature map
+			#NN, HH, WW, CC = pooledDeltaX.shape()
+			pooledDeltaXShape = pooledDeltaX.shape
+			HH = pooledDeltaXShape[0]
+			WW = pooledDeltaXShape[1]
+			CC = pooledDeltaXShape[2]
+		else:
+			#The delta come from convoluton
+			#NOTE: NN = N and CC = C, because pool decrease only the width and height of feature map
+			#NN, HH, WW, CC = pooledDeltaX.shape()
+			pooledDeltaXShape = pooledDeltaX.shape
+			HH = pooledDeltaXShape[0]
+			WW = pooledDeltaXShape[1]
+			CC = pooledDeltaXShape[2]
+		
+		
 		unpooledX = cache["Activations"]
 		parametersOfPooling = cache["PoolParameters"]
 		
 		#N is the batchSize.
 		#H, W, C is the height width channels of feature map which was pooled.
 		#N, H, W, C = unpooledX.shape()
-		H, W, C = unpooledX.shape()
+		unpooledShape = unpooledX.shape
+		H = unpooledShape[0]
+		W = unpooledShape[1]
+		C = unpooledShape[2]
 		
 		stride = parametersOfPooling["stride"]
 		fHeight = parametersOfPooling["poolingFilterHeight"]
 		fWidth = parametersOfPooling["poolingFilterWidth"]
-		
-		#NOTE: NN = N and CC = C, because pool decrease only the width and height of feature map
-		#NN, HH, WW, CC = pooledDeltaX.shape()
-		HH, WW, CC = pooledDeltaX.shape()
-		
-		unPooledDeltaX = None
-		unPooledDeltaX = np.zeros(unpooledX)
+
+		unPooledDeltaX = np.zeros_like(unpooledX, dtype=np.float128)
 		
 		#for n in range(N):
-		for depth in range(C):
+		for c in range(C):
 			for y in range(HH):
 				for x in range(WW):
 					xSlice = unpooledX[y*stride:y*stride+fHeight, x*stride:x*stride+fWidth, c]
-					
+					#print(xSlice)
+					xSlice = np.squeeze(xSlice)
+					#print(xSlice)
 					#Select thos i,j which is (/are) the maximal values of input, we propagates only those errors.
-					selectMax = (xSlice == np.max(xSlice))
+					selectMax = np.where(xSlice >= np.amax(xSlice), 1, 0)
 					
-					unPooledDeltaX[y*stride:y*stride+fHeight, x*stride:x*stride+fWidth, c] = selectMax * pooledDeltaX[y,x,depth]
+					unPooledDeltaX[y*stride:y*stride+fHeight, x*stride:x*stride+fWidth, c] = selectMax * pooledDeltaX[y,x,c]
 		return unPooledDeltaX
 
 ########################################################################################################################
 ##Loss function
 	#This loss function compute the absolute value of loss
 	def lossFunction(self, output, target):
-		loss = np.sum(np.absolute(np.subtract(output, target)))
+		#target is a scalaer betweeen 0 and 9
+		#we transfrom this scalar into a binary vector with 10 elements.
+		targetVector = np.zeros(len(output), dtype=np.float128)
+		targetVector[target-1] = 1.0
+		print(output)
+		print(targetVector)
+
+		loss = np.sum(np.absolute(np.subtract(output, targetVector)))
 		return loss
+
+########################################################################################################################
+##Gradients of Weights and Biases Summarizer
+	#This function sume up dWs and dBs for images (in a batch)
+	def doWeightsAndBiasSum(self, dWAll, dBAll, dWImg ,dBImg):
+		numberOfLayers = len(self.layers)
+		for layerID in range(numberOfLayers):
+			kernelCounts = len(self.layers[layerID].weights)
+			for kernelIdx in range(kernelCounts):
+				dWAll[layerID][kernelIdx] = np.add(dWAll[layerID][kernelIdx], dWImg[layerID][kernelIdx])
+				dBAll[layerID][kernelIdx] = np.add(dBAll[layerID][kernelIdx], dBImg[layerID][kernelIdx])
+		return dWAll, dBAll
 
 
 ########################################################################################################################
@@ -385,82 +468,124 @@ class CNN:
 	#It is a pipeline. The output of each function is the input of the next one.
 	#A for cycle iterate over all layers.
 	def forward(self, X):
-		cacheList = []
+		
 		#cacheList[5]["Weights"]
 		#TODO reshape X if it is neccessary
-
-		#first input
-		#it called output because later we will call the functions with these name.
-		output = X
-
-		#For cycle to create the cnn pipeline.
-		numberOfLAyers = len(self.layers)
-		for layerID in range(numberOfLAyers):
-			if self.layers[layerID].layerType == "Convolution":
-				cacheMap = {}
-				output = self.doPaddingOnLayer(output, layerID)
-				output, cache = self.doConvolutionsOnLayer(output, layerID)
-				cacheMap["X"] = cache[0]
-				cacheMap["Weights"] = cache[1]
-				output, cache = self.doBiasAddOnLayer(output, layerID)
-				cacheMap["Biases"] = cache
-				cacheMap["Z"] = output							#It is the logits before activation function.
-				output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
-				cacheMap["Activations"] = output
-				output, cache = self.maxPooling2D(output, 2, 2, 2, 2)
-				cacheMap["PoolParameters"] = cache[0]
-				cacheList.append(cacheMap)
-			elif self.layers[layerID].layerType == "FullyConnected":			#WARNING: fully connected before a convolutional layer is not working, check this.
-				output, cache = self.doFullyConnectedOperationOnLayer(output, layerID)
-				cacheMap["X"] = cache[0]
-				cacheMap["Shape"] = output[1]
-				cacheMap["Weights"] = cache[2]
-				cacheMap["Biases"] = cache[3]
-				cacheMap["Z"] = output
-				cacheList.append(cacheMap)
-				output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
-			
-			
-		return output, cacheList
+		predictions = [None] * len(X)
+		#TODO: This for cycle is necessary because we did not handle the batch list yet
+		for img in range(len(X)):
+			cacheList = []
+			#first input
+			#it called output because later we will call the functions with these name.
+			output = X[img]
+			#For cycle to create the cnn pipeline.
+			numberOfLAyers = len(self.layers)
+			for layerID in range(numberOfLAyers):
+				if self.layers[layerID].layerType == "Convolution":
+					cacheMap = {}
+					#print("BEFORE Padding:", output)
+					output, cache = self.doPaddingOnLayer(output, layerID)
+					#print("AFTER Padding:", output)
+					cacheMap["Padding"] = cache
+					output, cache = self.doConvolutionsOnLayer(output, layerID)
+					#print("AFTER CONV:", output)
+					cacheMap["X"] = cache[0]
+					cacheMap["Weights"] = cache[1]
+					#if layerID == 1:
+						#print(cacheMap["Weights"][1])
+					output, cache = self.doBiasAddOnLayer(output, layerID)
+					cacheMap["Biases"] = cache
+					cacheMap["Z"] = output							#It is the logits before activation function.
+					#print("AFTER CONV+bias:", output)
+					output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
+					cacheMap["Activations"] = output
+					#print("AFTER SIGMOID:", output)
+					output, cache = self.doMaxPoolingOnlayer(output, 2, 2, 2, 2)
+					#print("AFTER MaxPool:", output)
+					cacheMap["PoolParameters"] = cache
+					cacheList.append(cacheMap)
+				elif self.layers[layerID].layerType == "FullyConnected":			#WARNING: fully connected before a convolutional layer is not working, check this.
+					cacheMap = {}
+					output, cache = self.doFullyConnectedOperationOnLayer(output, layerID)
+					#print("after FC:", output)
+					cacheMap["X"] = cache[0]
+					cacheMap["Shape"] = cache[1]
+					cacheMap["Weights"] = cache[2]
+					cacheMap["Biases"] = cache[3]
+					cacheMap["Z"] = output
+					cacheList.append(cacheMap)
+					output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
+					#print("AFTER SM:", output)
+			predictions[img] = output
+		#raise Exception("ASD")
+		return predictions, cacheList
 
 
 
 
 	#backpropagation
-	def backpropagation(self, output, target, cacheList):
-		
-		loss = lossFunction(output, target)
-		
+	def backpropagation(self, predictions, target, cacheList):
+		#TODO: This for cycle is necessary because we did not handle the batch list yet
 		numberOfLayers = len(self.layers)
+		dWAll = [None] * numberOfLayers
+		dBAll = [None] * numberOfLayers
 		
-		#deltas = dE/dZ  it is the error for each layer
-		deltas = [None] * numberOfLayers
-		deltas[-1] = (loss)*(self.doDerivateOfActivationFunctionOnLayer(self.layers[-1].activationType))(cacheList[-1]["Z"])
+		totalLoss = 0
 		
-		dWAll = []
-		dBAll = []
-		
-		for layerID in reversed(range(numberOfLayers - 1)):
-			if self.layers[layerID].layerType == "Convolution":
-				#Check that the following layer after convolution is a fully connected
-				if self.layers[layerID + 1].layerType == "FullyConnected":
-					xShape = cacheList[layerID]["Shape"]
-					dXLayer, dWLayer, dBLayer = self.backwardConvoltuion(layerID, deltas[layerID+1], cacheList[layerID], xShape)
-				else:
-					dXLayer, dWLayer, dBLayer = self.backwardConvoltuion(layerID, deltas[layerID+1], cacheList[layerID])
-				#dX and the derivates of the nonlinearity have same shapes.
-				dXLayer = self.doMaxPoolingOnlayerBackWard(dXLayer, cacheList[layerID])
-				deltas[layerID] = dXLayer * (self.doDerivateOfActivationFunctionOnLayer(self.layers[layerID].activationType))(cacheList[layerID]["Z"])
-				dWAll.append(dWLayer)
-				dBAll.append(dBLayer)
-			elif self.layers[layerID].layerType == "FullyConnected":
-				dXLayer, dWLayer, dBLayer = self.backwardFullyConnected(layerID, deltas[layerID+1], cacheList[layerID])
-				#dX and the derivates of the nonlinearity have same shapes.
-				deltas[layerID] = dXLayer * (self.doDerivateOfActivationFunctionOnLayer(self.layers[layerID].activationType))(cacheList[layerID]["Z"])
-				dWAll.append(dWLayer)
-				dBAll.append(dBLayer)
-				
-		return dWAll, dBAll, loss
+		for img in range(len(target)):
+			currTarget = target[img]
+			currentPrediction = predictions[img]
+			#print(currentPrediction)
+			#print(currTarget)
+			loss = self.lossFunction(currentPrediction, currTarget)
+			
+			print(loss)
+			
+			#deltas = dE/dZ  it is the error for each layer
+			deltas = [None] * numberOfLayers
+			deltas[-1] = (loss)*(self.doDerivateOfActivationFunctionOnLayer((cacheList[-1]["Z"]), self.layers[-1].activationType))
+
+			dWImg = [None] * numberOfLayers
+			dBImg = [None] * numberOfLayers
+
+			for layerID in reversed(range(numberOfLayers)):
+				if self.layers[layerID].layerType == "Convolution":
+					#Check that the following layer after convolution is a fully connected
+					if self.layers[layerID + 1].layerType == "FullyConnected":
+						xShape = cacheList[layerID + 1]["Shape"]
+						dXLayer = self.doMaxPoolingOnlayerBackWard(deltas[layerID+1], cacheList[layerID], xShape)
+						dXLayer, dWLayer, dBLayer = self.backwardConvolution(layerID, dXLayer, cacheList[layerID])
+						padding = cacheList[layerID]["Padding"]
+						dXLayer = dXLayer[padding:-padding, padding:-padding]	#decrease the size of feature map with paddings
+					else:
+						dXLayer = self.doMaxPoolingOnlayerBackWard(deltas[layerID+1], cacheList[layerID])
+						dXLayer, dWLayer, dBLayer = self.backwardConvolution(layerID, dXLayer, cacheList[layerID])
+						padding = cacheList[layerID]["Padding"]
+						dXLayer = dXLayer[padding:-padding, padding:-padding]	#decrease the size of feature map with paddings
+					#dX and the derivates of the nonlinearity have same shapes.
+					deltas[layerID] = dXLayer * (self.doDerivateOfActivationFunctionOnLayer((cacheList[layerID]["Z"]), self.layers[layerID].activationType))
+					dWImg[layerID] = dWLayer
+					dBImg[layerID] = dBLayer
+				elif self.layers[layerID].layerType == "FullyConnected":
+					if layerID == (numberOfLayers - 1):
+						startDelta = (loss)*(self.doDerivateOfActivationFunctionOnLayer((cacheList[layerID]["Z"]), self.layers[layerID].activationType))
+						dXLayer, dWLayer, dBLayer = self.backwardFullyConnected(layerID, startDelta, cacheList[layerID])
+						#dX and the derivates of the nonlinearity have same shapes.
+						deltas[layerID] = dXLayer
+					else:
+						dXLayer, dWLayer, dBLayer = self.backwardFullyConnected(layerID, deltas[layerID+1], cacheList[layerID])
+						#dX and the derivates of the nonlinearity have same shapes.
+						deltas[layerID] = dXLayer * (self.doDerivateOfActivationFunctionOnLayer((cacheList[layerID]["Z"]), self.layers[layerID].activationType))
+					dWImg[layerID] = dWLayer
+					dBImg[layerID] = dBLayer
+			totalLoss += loss
+			if img == 0:
+				dWAll = dWImg
+				dBAll = dBImg
+			else:
+				dWAll, dBAll = self.doWeightsAndBiasSum(dWAll, dBAll, dWImg ,dBImg)
+			
+		return dWAll, dBAll, totalLoss
 
 ########################################################################################################################
 ##Weights and Biases UPDATES
@@ -468,35 +593,37 @@ class CNN:
 	def doUpdateWeightsAndBiases(self, dW, dB, lr):
 		numberOfLayers = len(self.layers)
 		for layerID in range(numberOfLayers):
-			kernelCounts = len(self.layers[layerID])
+			kernelCounts = len(self.layers[layerID].weights)
 			for kernelIdx in range(kernelCounts):
 				self.layers[layerID].weights[kernelIdx] = np.subtract(self.layers[layerID].weights[kernelIdx], (lr * dW[layerID][kernelIdx]))
-				self.layers[layerID].biases[kernelIdx] = np.subtract(self.layers[layerID].biases[kernelIdx], (lr * dB[layerID][biases]))
+				self.layers[layerID].biases[kernelIdx] = np.subtract(self.layers[layerID].biases[kernelIdx], (lr * dB[layerID][kernelIdx]))
 
 
 ########################################################################################################################
 ##TRAIN
 	#TODO in the first try we use batch size = 1
-	def train(self, x, y, batchSize=1, numberOfEpochs=100, lr = 0.01):
-		#TODO image load
-
+	def train(self, x, y, batchSize=1, numberOfEpochs=100, lr = 0.001):
+		numberOfAllImages = len(x)
 		for epoch in range(numberOfEpochs):
 			totalLoss = 0
-			numberOfBatches = np.ceil(numberOfAllImages / batchSize)
+			numberOfBatches = int(np.ceil(numberOfAllImages / batchSize))
+			print(numberOfBatches)
 			for batch in range(numberOfBatches):
-				#TODO loadImage + loadLabel
 				if batch == numberOfBatches:
 					batchSize = (numberOfAllImages - ((batch - 1) * batchSize))
-					batchX = imageLoader(sourceOfDB, batchSize, batch)
-					batchY = labelLoader(sourceOfDB, batchSize, batch)
+					batchX = x[batch:batch+batchSize]
+					batchY = y[batch:batch+batchSize]
 				else:
-					batchX = imageLoader(sourceOfDB, batchSize, batch)
-					batchY = labelLoader(sourceOfDB, batchSize, batch)
-					
-				prediction, cacheList = forward(batchX)
-				dW, dB, loss = backpropagation(prediction, batchY, cacheList)
+					batchX = x[batch:batch+batchSize]
+					batchY = y[batch:batch+batchSize]
+				#print(batchX)
+				#print(batchY)
+				#raise Exception("ASD")
+				
+				prediction, cacheList = self.forward(batchX)
+				dW, dB, loss = self.backpropagation(prediction, batchY, cacheList)
 				self.doUpdateWeightsAndBiases(dW, dB, lr)
 				totalLoss += loss
 			cost = (totalLoss/numberOfBatches)
 			print("[", epoch, "] epoch ", "average cost ",  cost)
-		return cnn		#TODO ????what should it return????
+		#return cnn		#TODO ????what should it return????
