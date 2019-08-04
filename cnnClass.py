@@ -9,10 +9,11 @@ import numpy as np
 
 
 class Layer:
-	def __init__(self, layrID, initializationType, layerType, weightSize):
+	def __init__(self, layrID, initializationType, layerType, activationType, weightSize):
 		self.layrID = layrID
-		self.initializationType = initializationType
-		self.layerType = layerType
+		self.initializationType = initializationType		#only Xavier allowed yet (WARNING the implementation is not Xavier yet.)
+		self.layerType = layerType				#convolution or fully connected
+		self.activationType = activationType			#nonlinearity of layer
 		self.weights = {}
 		self.biases = {}
 		#TODO: The Xavier is not uniform between -1 and +1  fix it.
@@ -23,29 +24,30 @@ class Layer:
 				kernelHeight = weightSize[1]
 				kernelWidth = weightSize[2]
 				channels = weightSize[3]
-			for kernelIdx in range(numberOfKernels):
-				self.weights[kernelIdx] = np.random.uniform(-1, +1, (kernelHeight, kernelWidth, channels))
-				self.biases[kernelIdx] = np.random.uniform(-1, +1, (1))
-			
+				for kernelIdx in range(numberOfKernels):
+					self.weights[kernelIdx] = np.random.uniform(-1, +1, (kernelHeight, kernelWidth, channels))
+					self.biases[kernelIdx] = np.random.uniform(-1, +1, (1))
+
 			elif self.layerType == "FullyConnected":
-				lastFeatureMapSize = weightSize[0]
+				lastFeatureMapSize = weightSize[0]	#TODO it must calculate instead of arbitrary give it.
 				numberOfOutPut = weightSize[1]
 				self.weights[0] = np.random.uniform(-1, +1, (lastFeatureMapSize, numberOfOutPut))
 				self.biases[0] = np.random.uniform(-1, +1, (numberOfOutPut))
 		else:
 			print("initializationType =", self.initializationType)
-			raise Exception("This initializationType is not defined yet.")
+			raise Exception("This initializationType is not defined yet. Only Xavier is allowed.")
 
 	def __del__(self): 
 		print('Destructor called, Layer deleted.')
 
 
 class CNN:
-	self.layers = []
+	layers = []
 	#TODO: weightSizeList is list of lists, which list ith elements represents the shape of ith layer weights. (TODO create a function which create this lists from input parameters.)
-	def __init__(self, numberOfLayers, initializationType, layerTypeList, weightSizeList):
+	def __init__(self, initializationType, layerTypeList, activationTypeList, weightSizeList):
+		numberOfLayers = len(layerTypeList)	#all lists in the arguments of this function have same number of elements.
 		for layer in range(numberOfLayers):
-			self.layers.append(Layer(layer, initializationType, layerTypeList[layer], weightSizeList[layer]))
+			self.layers.append(Layer(layer, initializationType, layerTypeList[layer], activationTypeList[layer], weightSizeList[layer]))
 	
 	def __del__(self): 
 		print('Destructor called, CNN deleted.')
@@ -109,8 +111,8 @@ class CNN:
 		for kernelIdx in range(outputDepth):
 			for h in range(outputHeight):
 				for w in range(outputWidth):
-				xSlice = inputFeatureMap[h:h+fH, w:w+fW, :]
-				outputFeatureMap[h, w, kernelIdx] = np.sum(xSlice * self.layers[layerID].weights[kernelIdx])
+					xSlice = inputFeatureMap[h:h+fH, w:w+fW, :]
+					outputFeatureMap[h, w, kernelIdx] = np.sum(xSlice * self.layers[layerID].weights[kernelIdx])
 		
 		#for backpropagation we need the X and W tensors
 		cache = (inputFeatureMap, self.layers[layerID].weights.copy())
@@ -182,7 +184,7 @@ class CNN:
 		outputVector = [None] * countOfClasses
 		for cls in range(countOfClasses):
 			for act in range(countOfActivation):
-				outputVector[cls] += np.add(np.multiply(X, self.layers[layerID].weights[0]), self.layers[layerID].biases[0]))
+				outputVector[cls] += np.add(np.multiply(X, self.layers[layerID].weights[0]), self.layers[layerID].biases[0])
 		
 		#for backpropagation we need the X and W tensors
 		cache = (X, xShape, self.layers[layerID].weights.copy(), self.layers[layerID].biases.copy())
@@ -223,35 +225,35 @@ class CNN:
 
 ########################################################################################################################
 ##Bias
-    #add biases to the input all elements
-    def doBiasAddOnLayer(self, inputFeatureMap, layerID):
-	#Feature map sizes
-	outputDepth = len(self.layers[layerID])
-        for kernelIdx in range(outputDepth):
-            outputFeatureMap[:,:,kernelIdx] = inputFeatureMap[:,:,kernelIdx] + self.layers[layerID].biases[kernelIdx]
-            
-	#for backpropagation we need the X and W tensors
-        cache = self.layers[layerID].biases.copy()
-	
-	#NOTE: the outputFeatureMap will store in the cacheList because it is the logits (commom notation is z)
-        return outputFeatureMap, cache
+	#add biases to the input all elements
+	def doBiasAddOnLayer(self, inputFeatureMap, layerID):
+		#Feature map sizes
+		outputDepth = len(self.layers[layerID])
+		for kernelIdx in range(outputDepth):
+			outputFeatureMap[:,:,kernelIdx] = inputFeatureMap[:,:,kernelIdx] + self.layers[layerID].biases[kernelIdx]
+		
+		#for backpropagation we need the X and W tensors
+		cache = self.layers[layerID].biases.copy()
+		
+		#NOTE: the outputFeatureMap will store in the cacheList because it is the logits (commom notation is z)
+		return outputFeatureMap, cache
     
     
 ##Activations(/Nonlinearities) and their derivates (derivates are neccessary during backpropagation).
     #This function return the selected activation function.
     #It is called in activationFunction() function.
 	def getActivationFunction(self, name):
-		if(name == 'sigmoid'):
+		if(name == "sigmoid"):
 			return lambda x : np.exp(x)/(1+np.exp(x))
-		elif(name == 'linear'):
+		elif(name == "linear"):
 			return lambda x : x
-		elif(name == 'relu'):
+		elif(name == "relu"):
 			def relu(x):
 				y = np.copy(x)
 				y[y<0] = 0
 				return y
 			return relu
-		elif(name == 'softmax'):
+		elif(name == "softmax"):
 			def softmax(x):
 				xx = np.copy(x)
 				y = np.exp(xx) / np.sum(np.exp(xx))
@@ -278,19 +280,19 @@ class CNN:
 	#At the backpropagation we should use these functions instead of the original activation functions.
 	#These are the derivatives of the original ones.
 	def getDerivitiveActivationFunction(self, name):
-		if(name == 'sigmoid'):
+		if(name == "sigmoid"):
 			sig = lambda x : np.exp(x)/(1+np.exp(x))
 			return lambda x :sig(x)*(1-sig(x))
-		elif(name == 'linear'):
+		elif(name == "linear"):
 			return lambda x: 1
-		elif(name == 'relu'):
+		elif(name == "relu"):
 			def relu_diff(x):
 				y = np.copy(x)
 				y[y>=0] = 1
 				y[y<0] = 0
 				return y
 			return relu_diff
-		elif(name == 'softmax'):
+		elif(name == "softmax"):
 			softmax = self.getActivationFunction('softmax')
 			return lambda x :softmax(x)*(1-softmax(x))		#NOTE: the description is different from this.
 		else:
@@ -393,31 +395,30 @@ class CNN:
 
 		#For cycle to create the cnn pipeline.
 		numberOfLAyers = len(self.layers)
-		for layer in range(numberOfLAyers):
-			if self.layers[layer].layerType == "Convolution":
+		for layerID in range(numberOfLAyers):
+			if self.layers[layerID].layerType == "Convolution":
 				cacheMap = {}
-				#TODO padding
-				output = self.doPaddingOnLayer(output, layer)
-				output, cache = self.doConvolutionsOnLayer(output, layer)
+				output = self.doPaddingOnLayer(output, layerID)
+				output, cache = self.doConvolutionsOnLayer(output, layerID)
 				cacheMap["X"] = cache[0]
 				cacheMap["Weights"] = cache[1]
-				output, cache = self.doBiasAddOnLayer(output, layer)
+				output, cache = self.doBiasAddOnLayer(output, layerID)
 				cacheMap["Biases"] = cache
 				cacheMap["Z"] = output							#It is the logits before activation function.
-				output = self.doActivationFunctionOnLayer(output, typeOfNonlinearity)    #NOTE: typeOfNonlinearity is not defined
+				output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
 				cacheMap["Activations"] = output
 				output, cache = self.maxPooling2D(output, 2, 2, 2, 2)
 				cacheMap["PoolParameters"] = cache[0]
 				cacheList.append(cacheMap)
-			elif self.layers[layer].layerType == "FullyConnected":              		#WARNING: fully connected before a convolutional layer is not working, check this.
-				output, cache = self.doFullyConnectedOperationOnLayer(output, layer)
+			elif self.layers[layerID].layerType == "FullyConnected":			#WARNING: fully connected before a convolutional layer is not working, check this.
+				output, cache = self.doFullyConnectedOperationOnLayer(output, layerID)
 				cacheMap["X"] = cache[0]
 				cacheMap["Shape"] = output[1]
 				cacheMap["Weights"] = cache[2]
 				cacheMap["Biases"] = cache[3]
 				cacheMap["Z"] = output
 				cacheList.append(cacheMap)
-				output = self.doActivationFunctionOnLayer(output, typeOfNonlinearity)    #NOTE: typeOfNonlinearity is not defined
+				output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
 			
 			
 		return output, cacheList
@@ -434,7 +435,7 @@ class CNN:
 		
 		#deltas = dE/dZ  it is the error for each layer
 		deltas = [None] * numberOfLayers
-		deltas[-1] = (loss)*(self.doDerivateOfActivationFunctionOnLayer(self.activations[-1]))(cacheList[-1]["Z"]))
+		deltas[-1] = (loss)*(self.doDerivateOfActivationFunctionOnLayer(self.layers[-1].activationType))(cacheList[-1]["Z"])
 		
 		dWAll = []
 		dBAll = []
@@ -449,17 +450,17 @@ class CNN:
 					dXLayer, dWLayer, dBLayer = self.backwardConvoltuion(layerID, deltas[layerID+1], cacheList[layerID])
 				#dX and the derivates of the nonlinearity have same shapes.
 				dXLayer = self.doMaxPoolingOnlayerBackWard(dXLayer, cacheList[layerID])
-				deltas[layerID] = dXLayer * (self.doDerivateOfActivationFunctionOnLayer(self.activations[layerID]))(cacheList[layerID]["Z"]))
+				deltas[layerID] = dXLayer * (self.doDerivateOfActivationFunctionOnLayer(self.layers[layerID].activationType))(cacheList[layerID]["Z"])
 				dWAll.append(dWLayer)
 				dBAll.append(dBLayer)
 			elif self.layers[layerID].layerType == "FullyConnected":
 				dXLayer, dWLayer, dBLayer = self.backwardFullyConnected(layerID, deltas[layerID+1], cacheList[layerID])
 				#dX and the derivates of the nonlinearity have same shapes.
-				deltas[layerID] = dXLayer * (self.doDerivateOfActivationFunctionOnLayer(self.activations[layerID]))(cacheList[layerID]["Z"]))
+				deltas[layerID] = dXLayer * (self.doDerivateOfActivationFunctionOnLayer(self.layers[layerID].activationType))(cacheList[layerID]["Z"])
 				dWAll.append(dWLayer)
 				dBAll.append(dBLayer)
 				
-		return dWAll, dBAll
+		return dWAll, dBAll, loss
 
 ########################################################################################################################
 ##Weights and Biases UPDATES
@@ -476,11 +477,11 @@ class CNN:
 ########################################################################################################################
 ##TRAIN
 	#TODO in the first try we use batch size = 1
-	def train(self x, y, batchSize=1, numberOfEpochs=100, lr = 0.01):
-		#TODO train
+	def train(self, x, y, batchSize=1, numberOfEpochs=100, lr = 0.01):
 		#TODO image load
 
 		for epoch in range(numberOfEpochs):
+			totalLoss = 0
 			numberOfBatches = np.ceil(numberOfAllImages / batchSize)
 			for batch in range(numberOfBatches):
 				#TODO loadImage + loadLabel
@@ -492,8 +493,10 @@ class CNN:
 					batchX = imageLoader(sourceOfDB, batchSize, batch)
 					batchY = labelLoader(sourceOfDB, batchSize, batch)
 					
-				sums, activations = forward(batchX)
-				dW, dB = backpropagation(batchY, sums, activations)
+				prediction, cacheList = forward(batchX)
+				dW, dB, loss = backpropagation(prediction, batchY, cacheList)
 				self.doUpdateWeightsAndBiases(dW, dB, lr)
-			
+				totalLoss += loss
+			cost = (totalLoss/numberOfBatches)
+			print("[", epoch, "] epoch ", "average cost ",  cost)
 		return cnn		#TODO ????what should it return????
