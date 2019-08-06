@@ -1,26 +1,31 @@
 #!/usr/bin/python3
 #
-# This python contains the possible layers of a CNN and their backpropagation functions.
-# Connect those layers in a CNN class.
+# This python scripts contains two class and their functions.
+#	1. class is the layer.
+#	2. class is the convolutional neural network.
+# Lots of usefull functions are implemented in this script.
+# These functions do the forward, backward, weights update and those operations which are necessary for these.
+# The CNN.train() function (at the end of code) is the main function of this code. With that and some hyperparameters we can train this CNN.
 #
 # author Nagy Marton
 
 import numpy as np
 
 
-
+#This is the Layer class which called by the CNN class.
+#The member variables of it contains information, which describe a CNN layer.
+#Furthermore the weights and biases, which are trainable parameters of CNN, initialize and stored in this class.
 class Layer:
 	def __init__(self, layrID, initializationType, layerType, activationType, weightSize):
-		self.layrID = layrID
-		self.initializationType = initializationType		#only Xavier allowed yet (WARNING the implementation is not Xavier yet.)
+		self.layrID = layrID					#It means the sequence number of layer. Later it will use for identify.
+		self.initializationType = initializationType		#only UniformRnd allowed yet
 		self.layerType = layerType				#convolution or fully connected
 		self.activationType = activationType			#nonlinearity of layer
-		self.weights = {}
-		self.biases = {}
-		#TODO: The Xavier is not uniform between -1 and +1  fix it.
-		if self.initializationType == "Xavier":
+		self.weights = {}					#trainable parameters
+		self.biases = {}					#trainable parameters
+		if self.initializationType == "UniformRandom":
 			if self.layerType == "Convolution":
-				#NOTE: [N,H,W,C] is the convention.
+				#[N,H,W,C] is the convention.
 				numberOfKernels = weightSize[0]
 				kernelHeight = weightSize[1]
 				kernelWidth = weightSize[2]
@@ -39,20 +44,23 @@ class Layer:
 				self.biases[0]= self.biases[0].astype(dtype=np.float128)
 		else:
 			print("initializationType =", self.initializationType)
-			raise Exception("This initializationType is not defined yet. Only Xavier is allowed.")
+			raise Exception("This initializationType is not defined yet. Only UniformRandom is allowed.")
 
 	def __del__(self): 
 		print('Destructor called, Layer deleted.')
 
-
+#This is the class of CNN (convolutional neural network).
+#The member variable of this class is the layers list.
+#The elements of this list is instance of the Layer class.
+#For example if we want to search the 20th kenrel at the 2nd layer, which is a convolution layer, 
+# we call self.layers[1].weights[19], which is a 3D numpy.array.
 class CNN:
 	layers = []
-	#TODO: weightSizeList is list of lists, which list ith elements represents the shape of ith layer weights. (TODO create a function which create this lists from input parameters.)
 	def __init__(self, initializationType, layerTypeList, activationTypeList, weightSizeList):
 		numberOfLayers = len(layerTypeList)	#all lists in the arguments of this function have same number of elements.
 		for layer in range(numberOfLayers):
 			self.layers.append(Layer(layer, initializationType, layerTypeList[layer], activationTypeList[layer], weightSizeList[layer]))
-			
+
 	
 	def __del__(self): 
 		print('Destructor called, CNN deleted.')
@@ -60,6 +68,7 @@ class CNN:
 
 ########################################################################################################################
 ##Padding
+#Padding means fill zero elements.
 	#If we want to get same output sizes after the convolution, like it were before, ...
 	#... this function determines the those parameters of padding. (xLeft, xRight, yBot, yTop)
 	#This is a naive function only works on the symmetric input and symmetric kernels.
@@ -110,6 +119,9 @@ class CNN:
 ########################################################################################################################
 ##Conv and FC
 	#Convolutional layer fowrard.
+	#This function convolutions for all kernels at a layer.
+	#The output of this function is a feature map.
+	#It fills a cache variable with inputs and weigths, because at the backpropagation it will use for further error determination.
 	def doConvolutionsOnLayer(self, inputFeatureMap, layerID):
 		#Filter/Kernel sizes
 		(fH,fW,fC) = self.layers[layerID].weights[0].shape
@@ -134,6 +146,9 @@ class CNN:
 		return outputFeatureMap, cache
 
 	#Backward convoltuion
+	#During backpropagation we need to propagate the errors of weights, biases and the inputActivation.
+	#This function determine these (dW, dB, dX) from delta, which comes from the next layer dX and the activation function of the current layer.
+	#The dX is just a numpy.array, but the dW and dB are stored in a list, which will be store (later in the code) another list.
 	def backwardConvolution(self, layerID, delta, cache):
 		
 		#Stored feature map
@@ -141,15 +156,8 @@ class CNN:
 		
 		#Stored wights
 		W = cache["Weights"]
-		
-		#shape (H,W,C) of input
-		#(Hprev, Wprev, Cprev) = X.shape
 
-		#shape (H,W,C) of a weight kernel
-		#(fH, fW, fC) = W[0].shape
 		shapeOfAWeightKernel = W[0].shape
-		#dim = len(shapeOfAWeightKernel)
-		#print(dim)
 		fH = shapeOfAWeightKernel[0]
 		fW = shapeOfAWeightKernel[1]
 		#fC = shapeOfAWeightKernel[2]
@@ -176,7 +184,7 @@ class CNN:
 			dB = np.zeros_like(self.layers[layerID].biases[kernelIdx], dtype=np.float128)	#NOTE: If all kernels are same this line can goto out from this for cycle.
 			for h in range(Hcurr):
 				for w in range(Wcurr):
-					dX[h:h+fH, w:w+fW, :] += W[kernelIdx] * delta[h,w,kernelIdx]
+					dX[h:h+fH, w:w+fW, :] += W[kernelIdx] * delta[h,w,kernelIdx]	#Only thos elementsof dX accumulates, which contributed to delta[h,w,kernelIdx] elements.
 					dW += X[h:h+fH, w:w+fW, :] * delta[h,w,kernelIdx]
 					dB += delta[h,w,kernelIdx]
 			dWList.append(dW)
@@ -185,9 +193,8 @@ class CNN:
 		
 		return dX, dWList, dBList
 
-
-
 	#Fully Connected layer forward.
+	#This function multiply the input activation(1D) with the weights of current layer(2D) and add to that the biases(1D).
 	def doFullyConnectedOperationOnLayer(self, inputFeatureMap, layerID):
 		#Create 1D vector from 3D feature map
 		#.flatten() do it if inputFeatureMap is a numpy.array
@@ -195,7 +202,6 @@ class CNN:
 		xShape = X.shape
 		#X.flatten()
 		X = np.reshape(X, (xShape[0] * xShape[1] * xShape[2]))
-
 
 		(countOfActivation, countOfClasses) = self.layers[layerID].weights[0].shape
 
@@ -207,6 +213,7 @@ class CNN:
 		return outputVector, cache
 
 	#Backward Fully Conected layer
+	#Determine the dX, dW, dB (mentioned above at the backwardConvolution()). The store of outputs 
 	def backwardFullyConnected(self, layerID, delta, cache):
 		
 		#Stored feature map (it is an 1D)
@@ -234,7 +241,9 @@ class CNN:
 
 ########################################################################################################################
 ##Bias
-	#add biases to the input all elements
+	#Add biases to all elements of the input
+	#The inputs of this function is the putput of the convolution layer so the output of this function is the logits.
+	#The logits is the input of activation function (commom notation is z).
 	def doBiasAddOnLayer(self, inputFeatureMap, layerID):
 		#Feature map sizes
 		outputFeatureMap = np.zeros_like(inputFeatureMap, dtype=np.float128)
@@ -245,14 +254,13 @@ class CNN:
 		#for backpropagation we need the X and W tensors
 		cache = self.layers[layerID].biases.copy()
 		
-		#NOTE: the outputFeatureMap will store in the cacheList because it is the logits (commom notation is z)
 		return outputFeatureMap, cache
-    
-    
+
+########################################################################################################################
 ##Activations(/Nonlinearities) and their derivates (derivates are neccessary during backpropagation).
 	
-	#TRY
-	def alternativeActivationFunction(self, name, X):
+	#This function contains same activation functions then getActivationFunction()[below], but this function is not use lambdas.
+	def getActivationFunctionWithoutLambda(self, name, X):
 		if(name == "sigmoid"):
 			y = np.copy(X)
 			results = np.exp(y)/(1+np.exp(y))
@@ -271,13 +279,10 @@ class CNN:
 			print('Unknown activation function. linear is used')
 			return lambda x: x
 		return
-	
-	
-	
-	
+
 	
 	#This function return the selected activation function.
-	#It is called in activationFunction() function.
+	#It is called by doActivationFunctionOnLayer() function.
 	def getActivationFunction(self, name):
 		if(name == "sigmoid"):
 			return lambda x : np.exp(x)/(1+np.exp(x))
@@ -301,7 +306,7 @@ class CNN:
 			return lambda x: x
 
 	#Nonlinearity or Activation function
-	#It is waiting the results of conv + bias and return with the activation of the selected nonlinearity type.
+	#It is waiting the results of conv + bias (=logits) and return with the activation of the selected nonlinearity type.
 	def doActivationFunctionOnLayer(self, inputFeatureMap, typeOfNonlinearity):
 		
 		#Select nonlinearity function
@@ -310,7 +315,7 @@ class CNN:
 		#Use activation function on input feature map
 		outputFeatureMap = activationFunction(inputFeatureMap)
 		
-		##outputFeatureMap = self.alternativeActivationFunction(typeOfNonlinearity, inputFeatureMap)
+		##outputFeatureMap = self.getActivationFunctionWithoutLambda(typeOfNonlinearity, inputFeatureMap)
 		
 		return outputFeatureMap
     
@@ -332,12 +337,13 @@ class CNN:
 			return relu_diff
 		elif(name == "softmax"):
 			softmax = self.getActivationFunction('softmax')
-			return lambda x :softmax(x)*(1-softmax(x))		#NOTE: the description is different from this.
+			return lambda x :softmax(x)*(1-softmax(x))		#NOTE: the description was different from it.
 		else:
 			print('Unknown activation function. linear is used')
 			return lambda x: 1
 
-	#TODO doDerivatActivation...
+	#Select derivates of Nonlinearity (or Activation) function
+	#It is waiting the results of conv + bias (=logits) and return with the activation of the selected derivates of the nonlinearity.
 	def doDerivateOfActivationFunctionOnLayer(self, inputFeatureMap, typeOfNonlinearity):
 		
 		#Select the derivate funciton of current nonlinearity.
@@ -426,9 +432,7 @@ class CNN:
 			for y in range(HH):
 				for x in range(WW):
 					xSlice = unpooledX[y*stride:y*stride+fHeight, x*stride:x*stride+fWidth, c]
-					#print(xSlice)
 					xSlice = np.squeeze(xSlice)
-					#print(xSlice)
 					#Select thos i,j which is (/are) the maximal values of input, we propagates only those errors.
 					selectMax = np.where(xSlice >= np.amax(xSlice), 1, 0)
 					
@@ -467,12 +471,13 @@ class CNN:
 	#This function get the input and propagate the information forward to the output of CNN.
 	#It is a pipeline. The output of each function is the input of the next one.
 	#A for cycle iterate over all layers.
+	#Create a list which cache all usefull results during forward run of CNN.
+	#For example if we want to find the 6th layer weights.lists, it seems like: cacheList[5]["Weights"]
+	#that is a list which each elements are a 3D numpy array.
 	def forward(self, X):
-		
-		#cacheList[5]["Weights"]
-		#TODO reshape X if it is neccessary
 		predictions = [None] * len(X)
 		#TODO: This for cycle is necessary because we did not handle the batch list yet
+		#The cacheList is not enough in this form if we use batch load in.
 		for img in range(len(X)):
 			cacheList = []
 			#first input
@@ -517,21 +522,22 @@ class CNN:
 					output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
 					#print("AFTER SM:", output)
 			predictions[img] = output
-		#raise Exception("ASD")
 		return predictions, cacheList
 
 
 
 
 	#backpropagation
+	#This is a pipeline similar to forward run.
+	#In this case we propagate the errors from at the end of cnn to the inputs.
+	#The propagation happened with a method which called chain rule. It is a chan if derivates.
 	def backpropagation(self, predictions, target, cacheList):
-		#TODO: This for cycle is necessary because we did not handle the batch list yet
 		numberOfLayers = len(self.layers)
 		dWAll = [None] * numberOfLayers
 		dBAll = [None] * numberOfLayers
 		
 		totalLoss = 0
-		
+		#TODO: This for cycle is necessary because we did not handle the batch list yet
 		for img in range(len(target)):
 			currTarget = target[img]
 			currentPrediction = predictions[img]
@@ -601,7 +607,13 @@ class CNN:
 
 ########################################################################################################################
 ##TRAIN
-	#TODO in the first try we use batch size = 1
+	#This is the train function which will be called at the main.
+	#This function call all functions which call the lower level ones.
+	#train() function load the input image into a batch which contains only 1 image per batch now (the higher batchsize is not working yet.).
+	#the loaded batch go through the cnn and the caches and outputs generated.
+	#Those results are the inputs of backpropagation() function which determine the delta Weights and delta biases.
+	#And after update those wights.
+	#NOTE in the first try we use batch size = 1
 	def train(self, x, y, batchSize=1, numberOfEpochs=100, lr = 0.001):
 		numberOfAllImages = len(x)
 		for epoch in range(numberOfEpochs):
@@ -616,14 +628,9 @@ class CNN:
 				else:
 					batchX = x[batch:batch+batchSize]
 					batchY = y[batch:batch+batchSize]
-				#print(batchX)
-				#print(batchY)
-				#raise Exception("ASD")
-				
 				prediction, cacheList = self.forward(batchX)
 				dW, dB, loss = self.backpropagation(prediction, batchY, cacheList)
 				self.doUpdateWeightsAndBiases(dW, dB, lr)
 				totalLoss += loss
 			cost = (totalLoss/numberOfBatches)
 			print("[", epoch, "] epoch ", "average cost ",  cost)
-		#return cnn		#TODO ????what should it return????
