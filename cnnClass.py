@@ -1,59 +1,96 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
+
+# TODO
 #
-# This python scripts contains two class and their functions.
-#	1. class is the layer.
-#	2. class is the convolutional neural network.
-# Lots of usefull functions are implemented in this script.
-# These functions do the forward, backward, weights update and those operations which are necessary for these.
-# The CNN.train() function (at the end of code) is the main function of this code. With that and some hyperparameters we can train this CNN.
-#
-# author Nagy Marton
+# @author Nagy Marton
+# @author Kisházi "janohhank" János
 
-import numpy as np
+# Scientific computing library.
+import numpy
 
-
-#This is the Layer class which called by the CNN class.
-#The member variables of it contains information, which describe a CNN layer.
-#Furthermore the weights and biases, which are trainable parameters of CNN, initialize and stored in this class.
+'''
+'' Neural network layer abstraction class which can be a convolutional layer or a fully connected layer.
+'' Initialize the weights of the kernels and the bias vectors elements.
+''
+'' TODO This class need to move in another script (Layer.py)
+''
+'' @author Nagy Marton
+'' @author Kisházi "janohhank" János
+'''
 class Layer:
-	def __init__(self, layrID, initializationType, layerType, activationType, weightSize):
-		self.layrID = layrID					#It means the sequence number of layer. Later it will use for identify.
-		self.initializationType = initializationType		#only UniformRnd allowed yet
-		self.layerType = layerType				#convolution or fully connected
-		self.activationType = activationType			#nonlinearity of layer
-		self.weights = {}					#trainable parameters
-		self.biases = {}					#trainable parameters
-		if self.initializationType == "UniformRandom":
-			if self.layerType == "Convolution":
-				#[N,H,W,C] is the convention.
-				numberOfKernels = weightSize[0]
-				kernelHeight = weightSize[1]
-				kernelWidth = weightSize[2]
-				channels = weightSize[3]
+	# The layer sequence number of neural network.
+	layerID = None
+
+	# The layer type, it can be Convolution or FullyConnected.
+	layerType = None
+
+	# The layer activation (nonlinearity) function type.
+	activationType = None
+
+	# Stored kernels weights map.
+	weights = {}
+
+	# Stored bias vectors map.
+	biases = {}
+
+	'''
+	'' Initialiaze a neural network layer elements and weights, biases.
+	'' @param layerID, is the identical number of the layer.
+	'' @param initializationType, is the initialization function type of the weights and biases.
+	'' @param layerType, is the layer type, it can be Convolution and FullyConnected.
+	'' @param activationType, is the nonlinearity function type which contains the lyer.
+	'' @param weightSize, convention is [N,H,W,C].
+	'''
+	def __init__(
+		self,
+		layerID,
+		initializationType,
+		layerType,
+		activationType,
+		weightSize
+	):
+		self.layerID = layerID
+		self.layerType = layerType
+		self.activationType = activationType
+
+		if(self.layerType == "Convolution"):
+			numberOfKernels = weightSize[0]
+			kernelHeight = weightSize[1]
+			kernelWidth = weightSize[2]
+			channels = weightSize[3]
+
+			# TODO put initialization into a function
+			if(initializationType == "UniformRandom"):
 				for kernelIdx in range(numberOfKernels):
-					self.weights[kernelIdx] = np.random.uniform(-0.01, +0.01, (kernelHeight, kernelWidth, channels))
-					self.weights[kernelIdx]= self.weights[kernelIdx].astype(dtype=np.float128)
-					self.biases[kernelIdx] = np.random.uniform(-0.01, +0.01, (1))
-					self.biases[kernelIdx]= self.biases[kernelIdx].astype(dtype=np.float128)
-			elif self.layerType == "FullyConnected":
-				lastFeatureMapSize = weightSize[0]	#TODO it must calculate instead of arbitrary give it.
-				numberOfOutPut = weightSize[1]
-				self.weights[0] = np.random.uniform(-0.01, +0.01, (lastFeatureMapSize, numberOfOutPut))
-				self.weights[0]= self.weights[0].astype(dtype=np.float128)
-				self.biases[0] = np.random.uniform(-0.01, +0.01, (numberOfOutPut))
-				self.biases[0]= self.biases[0].astype(dtype=np.float128)
+					self.weights[kernelIdx] = numpy.random.uniform(-0.01, +0.01, (kernelHeight, kernelWidth, channels))
+					self.weights[kernelIdx]= self.weights[kernelIdx].astype(dtype=numpy.float128)
+					self.biases[kernelIdx] = numpy.random.uniform(-0.01, +0.01, (1))
+					self.biases[kernelIdx]= self.biases[kernelIdx].astype(dtype=numpy.float128)
+			else:
+				raise Exception("Unhandled initialization type: " + str(initializationType))
+		elif(self.layerType == "FullyConnected"):
+			# TODO it must calculate instead of arbitrary give it.
+			lastFeatureMapSize = weightSize[0]
+			numberOfOutPut = weightSize[1]
+
+			# TODO put initialization into a function
+			if(initializationType == "UniformRandom"):
+				self.weights[0] = numpy.random.uniform(-0.01, +0.01, (lastFeatureMapSize, numberOfOutPut))
+				self.weights[0]= self.weights[0].astype(dtype=numpy.float128)
+				self.biases[0] = numpy.random.uniform(-0.01, +0.01, (numberOfOutPut))
+				self.biases[0]= self.biases[0].astype(dtype=numpy.float128)
+			else:
+				raise Exception("Unhandled initialization type: " + str(initializationType))
 		else:
-			print("initializationType =", self.initializationType)
-			raise Exception("This initializationType is not defined yet. Only UniformRandom is allowed.")
+			raise Exception("Unhandled layer type: " + str(layerType))
 
-	def __del__(self): 
-		print('Destructor called, Layer deleted.')
-
-#This is the class of CNN (convolutional neural network).
-#The member variable of this class is the layers list.
-#The elements of this list is instance of the Layer class.
-#For example if we want to search the 20th kenrel at the 2nd layer, which is a convolution layer, 
-# we call self.layers[1].weights[19], which is a 3D numpy.array.
+'''
+'' This is the class of CNN (convolutional neural network).
+'' The member variable of this class is the layers list.
+'' The elements of this list is instance of the Layer class.
+'' For example if we want to search the 20th kenrel at the 2nd layer, which is a convolution layer, 
+'' we call self.layers[1].weights[19], which is a 3D numpy.array.
+'''
 class CNN:
 	layers = []
 	def __init__(self, initializationType, layerTypeList, activationTypeList, weightSizeList):
@@ -85,7 +122,7 @@ class CNN:
 		
 		shapeOfFeatureMap = inputFeatureMap.shape
 		
-		P = int(np.ceil(((shapeOfFeatureMap[0] * kernelStride) - kernelStride - shapeOfFeatureMap[0] + kernelSizes) / 2))
+		P = int(numpy.ceil(((shapeOfFeatureMap[0] * kernelStride) - kernelStride - shapeOfFeatureMap[0] + kernelSizes) / 2))
 
 		#We return P in thise case it is equal with all parameters (xLeft, xRight, yBot, yTop) of padding. 
 		return P
@@ -108,7 +145,7 @@ class CNN:
 		
 		newH = H + yBot + yTop
 		newW = W + xLeft + xRight
-		outputFeatureMap = np.zeros((newH, newW, C), dtype=np.float128)
+		outputFeatureMap = numpy.zeros((newH, newW, C), dtype=numpy.float128)
 		outputFeatureMap[yTop:-yBot, xLeft:-xRight, :] = inputFeatureMap	#WARNING: these function does not handle the batchsize yet.
 		
 		cache = padding
@@ -132,13 +169,13 @@ class CNN:
 		outputHeight = inputHeight - fH + 1
 		outputWidth = inputWidth - fW + 1
 		
-		outputFeatureMap = np.zeros((outputHeight, outputWidth, outputDepth), dtype=np.float128)
+		outputFeatureMap = numpy.zeros((outputHeight, outputWidth, outputDepth), dtype=numpy.float128)
 		
 		for kernelIdx in range(outputDepth):
 			for h in range(outputHeight):
 				for w in range(outputWidth):
 					xSlice = inputFeatureMap[h:h+fH, w:w+fW, :]
-					outputFeatureMap[h, w, kernelIdx] = np.sum(xSlice * self.layers[layerID].weights[kernelIdx])
+					outputFeatureMap[h, w, kernelIdx] = numpy.sum(xSlice * self.layers[layerID].weights[kernelIdx])
 		
 		#for backpropagation we need the X and W tensors
 		cache = (inputFeatureMap, self.layers[layerID].weights.copy())
@@ -173,15 +210,15 @@ class CNN:
 		dWList = []
 		dBList = []
 		
-		dX = np.zeros(X.shape, dtype=np.float128)
+		dX = numpy.zeros(X.shape, dtype=numpy.float128)
 		
 		#Feature map sizes
 		countOfKernels = len(self.layers[layerID].weights)
 		for kernelIdx in range(countOfKernels):
 			#dE/dW
-			dW = np.zeros_like(self.layers[layerID].weights[kernelIdx], dtype=np.float128)	#NOTE: If all kernels are same this line can goto out from this for cycle.
+			dW = numpy.zeros_like(self.layers[layerID].weights[kernelIdx], dtype=numpy.float128)	#NOTE: If all kernels are same this line can goto out from this for cycle.
 			#dE/dB
-			dB = np.zeros_like(self.layers[layerID].biases[kernelIdx], dtype=np.float128)	#NOTE: If all kernels are same this line can goto out from this for cycle.
+			dB = numpy.zeros_like(self.layers[layerID].biases[kernelIdx], dtype=numpy.float128)	#NOTE: If all kernels are same this line can goto out from this for cycle.
 			for h in range(Hcurr):
 				for w in range(Wcurr):
 					dX[h:h+fH, w:w+fW, :] += W[kernelIdx] * delta[h,w,kernelIdx]	#Only thos elementsof dX accumulates, which contributed to delta[h,w,kernelIdx] elements.
@@ -201,11 +238,11 @@ class CNN:
 		X = inputFeatureMap.copy()
 		xShape = X.shape
 		#X.flatten()
-		X = np.reshape(X, (xShape[0] * xShape[1] * xShape[2]))
+		X = numpy.reshape(X, (xShape[0] * xShape[1] * xShape[2]))
 
 		(countOfActivation, countOfClasses) = self.layers[layerID].weights[0].shape
 
-		outputVector = np.add(np.matmul(X, self.layers[layerID].weights[0]), self.layers[layerID].biases[0])
+		outputVector = numpy.add(numpy.matmul(X, self.layers[layerID].weights[0]), self.layers[layerID].biases[0])
 		
 		#for backpropagation we need the X and W tensors
 		cache = (X, xShape, self.layers[layerID].weights.copy(), self.layers[layerID].biases.copy())
@@ -225,13 +262,13 @@ class CNN:
 		dWList = []
 		dBList = []
 		
-		dW = np.outer(X, delta)
-		dW= dW.astype(dtype=np.float128)
+		dW = numpy.outer(X, delta)
+		dW= dW.astype(dtype=numpy.float128)
 		dB = delta
-		dB= dB.astype(dtype=np.float128)
+		dB= dB.astype(dtype=numpy.float128)
 		
-		dX = np.dot(W[0], delta)
-		dX= dX.astype(dtype=np.float128)
+		dX = numpy.dot(W[0], delta)
+		dX= dX.astype(dtype=numpy.float128)
 		
 		dWList.append(dW)
 		dBList.append(dB)
@@ -246,7 +283,7 @@ class CNN:
 	#The logits is the input of activation function (commom notation is z).
 	def doBiasAddOnLayer(self, inputFeatureMap, layerID):
 		#Feature map sizes
-		outputFeatureMap = np.zeros_like(inputFeatureMap, dtype=np.float128)
+		outputFeatureMap = numpy.zeros_like(inputFeatureMap, dtype=numpy.float128)
 		outputDepth = len(self.layers[layerID].biases)
 		for kernelIdx in range(outputDepth):
 			outputFeatureMap[:,:,kernelIdx] = inputFeatureMap[:,:,kernelIdx] + self.layers[layerID].biases[kernelIdx]
@@ -262,18 +299,18 @@ class CNN:
 	#This function contains same activation functions then getActivationFunction()[below], but this function is not use lambdas.
 	def getActivationFunctionWithoutLambda(self, name, X):
 		if(name == "sigmoid"):
-			y = np.copy(X)
-			results = np.exp(y)/(1+np.exp(y))
+			y = numpy.copy(X)
+			results = numpy.exp(y)/(1+numpy.exp(y))
 			return results
 		elif(name == "linear"):
 			return X
 		elif(name == "relu"):
-			y = np.copy(X)
+			y = numpy.copy(X)
 			y[y<0] = 0
 			return y
 		elif(name == "softmax"):
-			xx = np.copy(x)
-			y = np.exp(xx) / np.sum(np.exp(xx))
+			xx = numpy.copy(x)
+			y = numpy.exp(xx) / numpy.sum(numpy.exp(xx))
 			return y
 		else:
 			print('Unknown activation function. linear is used')
@@ -285,19 +322,19 @@ class CNN:
 	#It is called by doActivationFunctionOnLayer() function.
 	def getActivationFunction(self, name):
 		if(name == "sigmoid"):
-			return lambda x : np.exp(x)/(1+np.exp(x))
+			return lambda x : numpy.exp(x)/(1+numpy.exp(x))
 		elif(name == "linear"):
 			return lambda x : x
 		elif(name == "relu"):
 			def relu(x):
-				y = np.copy(x)
+				y = numpy.copy(x)
 				y[y<0] = 0
 				return y
 			return relu
 		elif(name == "softmax"):
 			def softmax(x):
-				xx = np.copy(x)
-				y = np.exp(xx) / np.sum(np.exp(xx))
+				xx = numpy.copy(x)
+				y = numpy.exp(xx) / numpy.sum(numpy.exp(xx))
 				return y
 			return softmax
 				
@@ -324,13 +361,13 @@ class CNN:
 	#These are the derivatives of the original ones.
 	def getDerivitiveActivationFunction(self, name):
 		if(name == "sigmoid"):
-			sig = lambda x : np.exp(x)/(1+np.exp(x))
+			sig = lambda x : numpy.exp(x)/(1+numpy.exp(x))
 			return lambda x :sig(x)*(1-sig(x))
 		elif(name == "linear"):
 			return lambda x: 1
 		elif(name == "relu"):
 			def relu_diff(x):
-				y = np.copy(x)
+				y = numpy.copy(x)
 				y[y>=0] = 1
 				y[y<0] = 0
 				return y
@@ -362,17 +399,17 @@ class CNN:
 	def doMaxPoolingOnlayer(self, inputFeatureMap, kernelHeight, kernelWidth, strideY, strideX):
 		(inputWidth, inputHeight, inputChannels) = inputFeatureMap.shape
 		#determine the output resolution after pooling
-		outputHeight = int(np.ceil((inputHeight - kernelHeight) / strideY) + 1)
-		outputWidth = int(np.ceil((inputWidth - kernelWidth) / strideX) + 1)
+		outputHeight = int(numpy.ceil((inputHeight - kernelHeight) / strideY) + 1)
+		outputWidth = int(numpy.ceil((inputWidth - kernelWidth) / strideX) + 1)
 		
-		outputFeatureMap = np.zeros((outputHeight, outputWidth, inputChannels), dtype=np.float128)
+		outputFeatureMap = numpy.zeros((outputHeight, outputWidth, inputChannels), dtype=numpy.float128)
 		
 		for c in range(inputChannels):
 			for h in range(outputHeight):
 				for w in range(outputWidth):
 					#TODO indexing out from input we should handle those foreign pixels
 					xSlice = inputFeatureMap[(h*strideY):(h*strideY)+kernelHeight, (w*strideX):(w*strideX)+kernelWidth, c]
-					outputFeatureMap[h, w, c] = np.max(xSlice)
+					outputFeatureMap[h, w, c] = numpy.max(xSlice)
 		
 		parametersOfPooling = {}
 		parametersOfPooling["stride"] = strideY	#NOTE: it is same than strideX
@@ -392,7 +429,7 @@ class CNN:
 		if not (xShape is None):
 			#if the delta come from a fully connected it is a 1D vector
 			#Reshape it into 3D tensor
-			pooledDeltaX = np.reshape(pooledDeltaX, (xShape))
+			pooledDeltaX = numpy.reshape(pooledDeltaX, (xShape))
 			#(Hcurr, Wcurr, Ccurr) = delta.shape
 			#NOTE: NN = N and CC = C, because pool decrease only the width and height of feature map
 			#NN, HH, WW, CC = pooledDeltaX.shape()
@@ -425,16 +462,16 @@ class CNN:
 		fHeight = parametersOfPooling["poolingFilterHeight"]
 		fWidth = parametersOfPooling["poolingFilterWidth"]
 
-		unPooledDeltaX = np.zeros_like(unpooledX, dtype=np.float128)
+		unPooledDeltaX = numpy.zeros_like(unpooledX, dtype=numpy.float128)
 		
 		#for n in range(N):
 		for c in range(C):
 			for y in range(HH):
 				for x in range(WW):
 					xSlice = unpooledX[y*stride:y*stride+fHeight, x*stride:x*stride+fWidth, c]
-					xSlice = np.squeeze(xSlice)
+					xSlice = numpy.squeeze(xSlice)
 					#Select thos i,j which is (/are) the maximal values of input, we propagates only those errors.
-					selectMax = np.where(xSlice >= np.amax(xSlice), 1, 0)
+					selectMax = numpy.where(xSlice >= numpy.amax(xSlice), 1, 0)
 					
 					unPooledDeltaX[y*stride:y*stride+fHeight, x*stride:x*stride+fWidth, c] = selectMax * pooledDeltaX[y,x,c]
 		return unPooledDeltaX
@@ -445,12 +482,12 @@ class CNN:
 	def lossFunction(self, output, target):
 		#target is a scalaer betweeen 0 and 9
 		#we transfrom this scalar into a binary vector with 10 elements.
-		targetVector = np.zeros(len(output), dtype=np.float128)
+		targetVector = numpy.zeros(len(output), dtype=numpy.float128)
 		targetVector[target-1] = 1.0
 		print(output)
 		print(targetVector)
 
-		loss = np.sum(np.absolute(np.subtract(output, targetVector)))
+		loss = numpy.sum(numpy.absolute(numpy.subtract(output, targetVector)))
 		return loss
 
 ########################################################################################################################
@@ -461,8 +498,8 @@ class CNN:
 		for layerID in range(numberOfLayers):
 			kernelCounts = len(self.layers[layerID].weights)
 			for kernelIdx in range(kernelCounts):
-				dWAll[layerID][kernelIdx] = np.add(dWAll[layerID][kernelIdx], dWImg[layerID][kernelIdx])
-				dBAll[layerID][kernelIdx] = np.add(dBAll[layerID][kernelIdx], dBImg[layerID][kernelIdx])
+				dWAll[layerID][kernelIdx] = numpy.add(dWAll[layerID][kernelIdx], dWImg[layerID][kernelIdx])
+				dBAll[layerID][kernelIdx] = numpy.add(dBAll[layerID][kernelIdx], dBImg[layerID][kernelIdx])
 		return dWAll, dBAll
 
 
@@ -601,8 +638,8 @@ class CNN:
 		for layerID in range(numberOfLayers):
 			kernelCounts = len(self.layers[layerID].weights)
 			for kernelIdx in range(kernelCounts):
-				self.layers[layerID].weights[kernelIdx] = np.subtract(self.layers[layerID].weights[kernelIdx], (lr * dW[layerID][kernelIdx]))
-				self.layers[layerID].biases[kernelIdx] = np.subtract(self.layers[layerID].biases[kernelIdx], (lr * dB[layerID][kernelIdx]))
+				self.layers[layerID].weights[kernelIdx] = numpy.subtract(self.layers[layerID].weights[kernelIdx], (lr * dW[layerID][kernelIdx]))
+				self.layers[layerID].biases[kernelIdx] = numpy.subtract(self.layers[layerID].biases[kernelIdx], (lr * dB[layerID][kernelIdx]))
 
 
 ########################################################################################################################
@@ -618,7 +655,7 @@ class CNN:
 		numberOfAllImages = len(x)
 		for epoch in range(numberOfEpochs):
 			totalLoss = 0
-			numberOfBatches = int(np.ceil(numberOfAllImages / batchSize))
+			numberOfBatches = int(numpy.ceil(numberOfAllImages / batchSize))
 			print(numberOfBatches)
 			for batch in range(numberOfBatches):
 				if batch == numberOfBatches:
