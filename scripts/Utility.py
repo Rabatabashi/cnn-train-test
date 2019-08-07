@@ -9,7 +9,7 @@ import numpy
 '' TODO This class need to move into another script (Utility.py)
 ''
 '' @author Nagy Marton
-'' @author Kisházi "janohhank" János
+'' @author Kishazi "janohhank" Janos
 '''
 class Utility:
 	'''

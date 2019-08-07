@@ -3,9 +3,9 @@
 # Scientific computing library.
 import numpy
 # Our Layer class import.
-import Layer from Layer
+import Layer
 # Our Utility class import.
-import Utility from Utility
+import Utility
 
 '''
 '' Representation a type of convulutional neural network and contains all the
@@ -13,7 +13,7 @@ import Utility from Utility
 '' It stores the neural network layers in a list.
 ''
 '' @author Nagy Marton
-'' @author Kisházi "janohhank" János
+'' @author Kishazi "janohhank" Janos
 '''
 class CNN:
 	# Neural network layers storage.
@@ -37,8 +37,8 @@ class CNN:
 		numberOfLayers = len(layerTypeList)
 		for layerID in range(numberOfLayers):
 			self.layers.append(
-				Layer(
-					layer,
+				Layer.Layer(
+					layerID,
 					initializationType,
 					layerTypeList[layerID],
 					activationTypeList[layerID],
@@ -476,7 +476,7 @@ class CNN:
 	'' @param layerID, is the current layer ID.
 	'''
 	def doDerivateOfActivationFunctionOnLayer(self, inputFeatureMap, layerID):
-		typeOfNonlinearity = self.layers[layerID].activationType)
+		typeOfNonlinearity = self.layers[layerID].activationType
 
 		# Selects the derivate function of the current nonlinearity.
 		derivateOfActivationFunction = Utility.getDerivitiveActivationFunction(typeOfNonlinearity)

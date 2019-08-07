@@ -3,16 +3,18 @@
 # Loads the mnist images and labels and trains a fully connected neural network with multiple layers.
 #
 # @author Nagy Marton
-# @author Kisházi "janohhank" János
+# @author Kishazi "janohhank" Janos
 
+# This module provides a portable way of using operating system dependent functionality.
+import os
 # Command lien argumentum parser library.
 import argparse
 # Scientific computing library.
 import numpy
 # Database provider library.
-import MNIST
+import mnist
 # Our convulotional neural network abstraction.
-import CNN from CNN
+import CNN
 
 parser = argparse.ArgumentParser(description="TODO")
 parser.add_argument("--mnistDir",required=True,type=str,help="The path of a directory which includes the MNIST files.")
@@ -24,7 +26,7 @@ if(os.path.isdir(mnistDir) is False):
 	raise Exception("The mnistDir input parameter does not denote a directory: " + mnistDir)
 
 print("[" + __file__ + "]" + "[INFO]" + " Loading MNIST data.")
-mnistData = MNIST.mnist(mnistDir)
+mnistData = mnist.MNIST(mnistDir)
 
 # Load training images (for train)
 trainImages, trainLabels = mnistData.load_training()
@@ -56,7 +58,7 @@ activationTypeList = ["sigmoid", "sigmoid", "sigmoid"]
 weightSizeList = [[10, 3, 3, 1], [10, 3, 3, 10], [10*7*7, 10]]
 
 # Initialization of a network.
-CNN = cnnClass.CNN(initializationType, layerTypeList, activationTypeList, weightSizeList)
+cnn = CNN.CNN(initializationType, layerTypeList, activationTypeList, weightSizeList)
 print("[" + __file__ + "]" + "[INFO]" + " CNN initialized.")
 
 # TODO image preprocessing need to be modified and moved into a class/utility script.
@@ -70,5 +72,5 @@ for i in range(numberOfTrainExample):
 	yy[i] = numpy.asarray(trainLabels[i])
 
 print("[" + __file__ + "]" + "[INFO]" + " Start training.")
-CNN.train(xx, yy, batchSize=1, numberOfEpochs=5, lr=0.0001)
+cnn.train(xx, yy, batchSize=1, numberOfEpochs=5, learningRate=0.0001)
 print("[" + __file__ + "]" + "[INFO]" + " Training done.")

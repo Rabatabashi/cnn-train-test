@@ -8,7 +8,7 @@ import numpy
 '' Initialize the weights of the kernels and the bias vectors elements.
 ''
 '' @author Nagy Marton
-'' @author Kisházi "janohhank" János
+'' @author Kishazi "janohhank" Janos
 '''
 class Layer:
 	# The layer sequence number of neural network.
