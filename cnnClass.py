@@ -12,7 +12,7 @@ import numpy
 '' Neural network layer abstraction class which can be a convolutional layer or a fully connected layer.
 '' Initialize the weights of the kernels and the bias vectors elements.
 ''
-'' TODO This class need to move in another script (Layer.py)
+'' TODO This class need to move into another script (Layer.py)
 ''
 '' @author Nagy Marton
 '' @author Kisházi "janohhank" János
@@ -160,7 +160,7 @@ class CNN:
 					#print("AFTER CONV+bias:", output)
 
 					#print("BEFORE ACTIVATION:", output)
-					output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
+					output = self.doActivationFunctionOnLayer(output, layerID)
 					cacheMap["Activations"] = output
 					#print("AFTER ACTIVATION:", output)
 
@@ -184,48 +184,66 @@ class CNN:
 					#print("AFTER FC:", output)
 
 					#print("BEFORE ACTIVATION:", output)
-					output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
+					output = self.doActivationFunctionOnLayer(output, layerID)
 					#print("AFTER ACTIVATION:", output)
 
 					cacheList.append(cacheMap)
 			predictions[img] = output
 		return predictions, cacheList
 
-########################################################################################################################
-##Padding
-#Padding means fill zero elements.
-	#If we want to get same output sizes after the convolution, like it were before, ...
-	#... this function determines the those parameters of padding. (xLeft, xRight, yBot, yTop)
-	#This is a naive function only works on the symmetric input and symmetric kernels.
+	'''
+	'' If we want to get same output sizes after the convolution, like it were before
+	'' this function determines the those parameters of padding. (xLeft, xRight, yBot, yTop)
+	'' Note that this is a naive function only works on the symmetric input and symmetric kernels.
+	'' @param inputFeatureMap, is the input feature mapv (3D tensor).
+	'' @param layerID, is the current layer ID.
+	'''
 	def doPaddingParameterDetermination(self, inputFeatureMap, layerID):
-		#The base equation of the size of next feature map is: O = ((I - K + 2P) / S) + 1
-		#,where O: output size; I: input size; K: kernel size; P: pading size; S: kernel stride
-		#If we want to same size we need to I = O and we sort the equation to P [P = (I*S - S - I + K) / 2]
-		(fH,fW,fC) = self.layers[layerID].weights[0].shape
-		#NOTE: We handle only symmetric kernels now, later it will be different aspect ratio too.
-		kernelSizes = fH
-		
-		#NOTE: WE use one kernel strides, later it will be a parameters too.
-		kernelStride = 1
-		
-		shapeOfFeatureMap = inputFeatureMap.shape
-		
-		P = int(numpy.ceil(((shapeOfFeatureMap[0] * kernelStride) - kernelStride - shapeOfFeatureMap[0] + kernelSizes) / 2))
+		# The base equation of the size of next feature map is:
+		#		O = ((I - K + 2P) / S) + 1
+		#	where
+		#		O: output size
+		#		I: input size
+		#		K: kernel size
+		#		P: pading size
+		#		S: kernel stride
+		# If we want to same size we need to I = O and we sort the equation to P.
+		#		P = (I*S - S - I + K) / 2
 
-		#We return P in thise case it is equal with all parameters (xLeft, xRight, yBot, yTop) of padding. 
+		(fH,fW,fC) = self.layers[layerID].weights[0].shape
+
+		# NOTE we handle only symmetric kernels now, later it will be different aspect ratio too.
+		kernelSizes = fH
+
+		#NOTE we use one kernel strides, later it will be a parameters too.
+		kernelStride = 1
+
+		shapeOfFeatureMap = inputFeatureMap.shape
+		P = int(
+			numpy.ceil(
+				((shapeOfFeatureMap[0] * kernelStride) - kernelStride - shapeOfFeatureMap[0] + kernelSizes) / 2
+			)
+		)
+
+		# Return P in which is equal with all parameters (xLeft, xRight, yBot, yTop) of padding.
 		return P
 
 
-	#This function create a padding around the feature map.
+	'''
+	'' Creates a padding around the feature map. In this case padding means fill the map boundies with zero elements.
+	'' @param inputFeatureMap, is the input feature map (3D tensor).
+	'' @param layerID, is the current layer ID.
+	'''
 	def doPaddingOnLayer(self, inputFeatureMap, layerID):
-		#Call the naive parameter determinator function.
+		# Call a naive parameter determinator function.
 		padding = self.doPaddingParameterDetermination(inputFeatureMap, layerID)
-					    
+
+		# Because we assumes the symmetry all parameter is the same.
 		yBot = yTop = xLeft = xRight = padding
-		
-		#inputFeatureMap is a 3D tensor. (input feature map.
-		#Handle different to the opposite sides of the tensor, because the kernel sizes can be even and if the feature map is not even it can be indexing out frominput.
-		#assymetric kernel sizes make it neccessary of the neighboor  sides should be different have different shapes at paadding.
+
+		# Handle different to the opposite sides of the tensor, because the kernel sizes can be even
+		# and if the feature map is not even it can be indexing out from the input.
+		# Assymetric kernel sizes make it neccessary of the neighboor sides should be different have different shapes at padding.
 		shapeOfFeatureMap = inputFeatureMap.shape
 		H = shapeOfFeatureMap[0]
 		W = shapeOfFeatureMap[1]
@@ -234,42 +252,131 @@ class CNN:
 		newH = H + yBot + yTop
 		newW = W + xLeft + xRight
 		outputFeatureMap = numpy.zeros((newH, newW, C), dtype=numpy.float128)
-		outputFeatureMap[yTop:-yBot, xLeft:-xRight, :] = inputFeatureMap	#WARNING: these function does not handle the batchsize yet.
-		
-		cache = padding
-		
-		return outputFeatureMap, cache
-	
+		outputFeatureMap[yTop:-yBot, xLeft:-xRight, :] = inputFeatureMap
 
-########################################################################################################################
-##Conv and FC
-	#Convolutional layer fowrard.
-	#This function convolutions for all kernels at a layer.
-	#The output of this function is a feature map.
-	#It fills a cache variable with inputs and weigths, because at the backpropagation it will use for further error determination.
+		cache = padding
+
+		return outputFeatureMap, cache
+
+	'''
+	'' Does a convolution on all kernels at a layer.
+	''
+	'' @param inputFeatureMap, is the input feature map (3D tensor).
+	'' @param layerID, is the current layer ID.
+	'' @return The output of this function is a feature map.
+	''	It fills a cache variable with inputs and weigths,
+	''	because at the backpropagation it will use for further error determination.
+	'''
 	def doConvolutionsOnLayer(self, inputFeatureMap, layerID):
-		#Filter/Kernel sizes
+		# We assumes that all kernels are the same shape.
 		(fH,fW,fC) = self.layers[layerID].weights[0].shape
-		
-		#Feature map sizes
+
+		# Feature map size.
 		outputDepth = len(self.layers[layerID].weights)
 		(inputWidth, inputHeight, inputChannels) = inputFeatureMap.shape
 		outputHeight = inputHeight - fH + 1
 		outputWidth = inputWidth - fW + 1
-		
+
 		outputFeatureMap = numpy.zeros((outputHeight, outputWidth, outputDepth), dtype=numpy.float128)
-		
 		for kernelIdx in range(outputDepth):
 			for h in range(outputHeight):
 				for w in range(outputWidth):
 					xSlice = inputFeatureMap[h:h+fH, w:w+fW, :]
 					outputFeatureMap[h, w, kernelIdx] = numpy.sum(xSlice * self.layers[layerID].weights[kernelIdx])
-		
-		#for backpropagation we need the X and W tensors
-		cache = (inputFeatureMap, self.layers[layerID].weights.copy())
-		
+
+		# For the backpropagation we need to store the input and weight tensors.
+		cache = (inputFeatureMap.copy(), self.layers[layerID].weights.copy())
+
 		return outputFeatureMap, cache
 
+	'''
+	'' Adds biases to all elements of the input.
+	'' @param inputFeatureMap, is the input feature map (3D tensor).
+	'' @param layerID, is the current layer ID.
+	'''
+	def doBiasAddOnLayer(self, inputFeatureMap, layerID):
+		outputFeatureMap = numpy.zeros_like(inputFeatureMap, dtype=numpy.float128)
+
+		outputDepth = len(self.layers[layerID].biases)
+		for kernelIdx in range(outputDepth):
+			outputFeatureMap[:,:,kernelIdx] = inputFeatureMdoMaxPoolingOnlayerap[:,:,kernelIdx] + self.layers[layerID].biases[kernelIdx]
+
+		# For the backpropagation we need to store the input and bias vectors.
+		cache = self.layers[layerID].biases.copy()
+
+		return outputFeatureMap, cache
+
+	'''
+	'' Use the activation function (nonlinearity funtcion) on a layer.
+	'' @param inputFeatureMap, is the input feature map (3D tensor).
+	'' @param layerID, is the current layer ID.
+	'''
+	def doActivationFunctionOnLayer(self, inputFeatureMap, layerID):
+		typeOfNonlinearity = self.layers[layerID].activationType
+
+		# Gets the nonlinearity function.
+		activationFunction = self.getActivationFunction(typeOfNonlinearity)
+
+		# Use activation function on input feature map.
+		outputFeatureMap = activationFunction(inputFeatureMap)
+
+		return outputFeatureMap
+
+	'''
+	'' Does a max-pooling on a layer.
+	'' Reduces the height and width of feature map, (select the maximal activity in the kernel slices).
+	'' @param inputFeatureMap, is the input feature map (3D tensor).
+	'' @param kernelHeight, TODO stores this in the Layer.
+	'' @param kernelWidth, TODO stores this in the Layer.
+	'' @param strideY, TODO stores this in the Layer.
+	'' @param strideX, TODO stores this in the Layer.
+	'''
+	def doMaxPoolingOnlayer(self, inputFeatureMap, kernelHeight, kernelWidth, strideY, strideX):
+		(inputWidth, inputHeight, inputChannels) = inputFeatureMap.shape
+
+		# Determine the output resolution after pooling.
+		outputHeight = int(numpy.ceil((inputHeight - kernelHeight) / strideY) + 1)
+		outputWidth = int(numpy.ceil((inputWidth - kernelWidth) / strideX) + 1)
+
+		outputFeatureMap = numpy.zeros((outputHeight, outputWidth, inputChannels), dtype=numpy.float128)
+		for c in range(inputChannels):
+			for h in range(outputHeight):
+				for w in range(outputWidth):
+					# TODO indexing out from input we should handle those foreign pixels.
+					xSlice = inputFeatureMap[(h*strideY):(h*strideY)+kernelHeight, (w*strideX):(w*strideX)+kernelWidth, c]
+					outputFeatureMap[h, w, c] = numpy.max(xSlice)
+
+		parametersOfPooling = {}
+		parametersOfPooling["stride"] = strideY #NOTE at this time this is the same than strideX.
+		parametersOfPooling["poolingFilterHeight"] = kernelHeight
+		parametersOfPooling["poolingFilterWidth"] = kernelWidth
+
+		# For the backpropagation we need to store the input the parameters of pooling.
+		cache = parametersOfPooling
+
+		return outputFeatureMap, cache
+
+	'''
+	'' Does a fully connected tensor operation on layer.
+	'' This function multiplies the input activation (1D) with the weights of current layer (2D) and add to that the biases (1D).
+	'' @param inputFeatureMap, is the input feature map (3D tensor).
+	'' @param layerID, is the current layer ID.
+	'''
+	def doFullyConnectedOperationOnLayer(self, inputFeatureMap, layerID):
+		# Create 1D vector from 3D feature map, the flatten() do it if inputFeatureMap is a numpy.array.
+		xShape = inputFeatureMap.shape
+		X = numpy.reshape(inputFeatureMap.copy(), (xShape[0] * xShape[1] * xShape[2]))
+
+		(countOfActivation, countOfClasses) = self.layers[layerID].weights[0].shape
+
+		outputVector = numpy.add(numpy.matmul(X, self.layers[layerID].weights[0]), self.layers[layerID].biases[0])
+
+		# For the backpropagation we need to store the input and weights and biases.
+		cache = (X, xShape, self.layers[layerID].weights.copy(), self.layers[layerID].biases.copy())
+
+		return outputVector, cache
+
+####################################### janohhank rework end line ######################################
 	#Backward convoltuion
 	#During backpropagation we need to propagate the errors of weights, biases and the inputActivation.
 	#This function determine these (dW, dB, dX) from delta, which comes from the next layer dX and the activation function of the current layer.
@@ -318,25 +425,6 @@ class CNN:
 		
 		return dX, dWList, dBList
 
-	#Fully Connected layer forward.
-	#This function multiply the input activation(1D) with the weights of current layer(2D) and add to that the biases(1D).
-	def doFullyConnectedOperationOnLayer(self, inputFeatureMap, layerID):
-		#Create 1D vector from 3D feature map
-		#.flatten() do it if inputFeatureMap is a numpy.array
-		X = inputFeatureMap.copy()
-		xShape = X.shape
-		#X.flatten()
-		X = numpy.reshape(X, (xShape[0] * xShape[1] * xShape[2]))
-
-		(countOfActivation, countOfClasses) = self.layers[layerID].weights[0].shape
-
-		outputVector = numpy.add(numpy.matmul(X, self.layers[layerID].weights[0]), self.layers[layerID].biases[0])
-		
-		#for backpropagation we need the X and W tensors
-		cache = (X, xShape, self.layers[layerID].weights.copy(), self.layers[layerID].biases.copy())
-		
-		return outputVector, cache
-
 	#Backward Fully Conected layer
 	#Determine the dX, dW, dB (mentioned above at the backwardConvolution()). The store of outputs 
 	def backwardFullyConnected(self, layerID, delta, cache):
@@ -362,24 +450,6 @@ class CNN:
 		dBList.append(dB)
 		
 		return dX, dWList, dBList
-
-
-########################################################################################################################
-##Bias
-	#Add biases to all elements of the input
-	#The inputs of this function is the putput of the convolution layer so the output of this function is the logits.
-	#The logits is the input of activation function (commom notation is z).
-	def doBiasAddOnLayer(self, inputFeatureMap, layerID):
-		#Feature map sizes
-		outputFeatureMap = numpy.zeros_like(inputFeatureMap, dtype=numpy.float128)
-		outputDepth = len(self.layers[layerID].biases)
-		for kernelIdx in range(outputDepth):
-			outputFeatureMap[:,:,kernelIdx] = inputFeatureMap[:,:,kernelIdx] + self.layers[layerID].biases[kernelIdx]
-		
-		#for backpropagation we need the X and W tensors
-		cache = self.layers[layerID].biases.copy()
-		
-		return outputFeatureMap, cache
 
 ########################################################################################################################
 ##Activations(/Nonlinearities) and their derivates (derivates are neccessary during backpropagation).
@@ -429,20 +499,6 @@ class CNN:
 		else:
 			print('Unknown activation function. linear is used')
 			return lambda x: x
-
-	#Nonlinearity or Activation function
-	#It is waiting the results of conv + bias (=logits) and return with the activation of the selected nonlinearity type.
-	def doActivationFunctionOnLayer(self, inputFeatureMap, typeOfNonlinearity):
-		
-		#Select nonlinearity function
-		activationFunction = self.getActivationFunction(typeOfNonlinearity)
-		
-		#Use activation function on input feature map
-		outputFeatureMap = activationFunction(inputFeatureMap)
-		
-		##outputFeatureMap = self.getActivationFunctionWithoutLambda(typeOfNonlinearity, inputFeatureMap)
-		
-		return outputFeatureMap
     
     
 	#At the backpropagation we should use these functions instead of the original activation functions.
@@ -483,31 +539,6 @@ class CNN:
 
 ########################################################################################################################
 #Poolings
-	#Max-pooling layer - reduce the height and width of feature map, (select the maximal activity in the kernel slices)
-	def doMaxPoolingOnlayer(self, inputFeatureMap, kernelHeight, kernelWidth, strideY, strideX):
-		(inputWidth, inputHeight, inputChannels) = inputFeatureMap.shape
-		#determine the output resolution after pooling
-		outputHeight = int(numpy.ceil((inputHeight - kernelHeight) / strideY) + 1)
-		outputWidth = int(numpy.ceil((inputWidth - kernelWidth) / strideX) + 1)
-		
-		outputFeatureMap = numpy.zeros((outputHeight, outputWidth, inputChannels), dtype=numpy.float128)
-		
-		for c in range(inputChannels):
-			for h in range(outputHeight):
-				for w in range(outputWidth):
-					#TODO indexing out from input we should handle those foreign pixels
-					xSlice = inputFeatureMap[(h*strideY):(h*strideY)+kernelHeight, (w*strideX):(w*strideX)+kernelWidth, c]
-					outputFeatureMap[h, w, c] = numpy.max(xSlice)
-		
-		parametersOfPooling = {}
-		parametersOfPooling["stride"] = strideY	#NOTE: it is same than strideX
-		parametersOfPooling["poolingFilterHeight"] = kernelHeight
-		parametersOfPooling["poolingFilterWidth"] = kernelWidth
-		#for backpropagation
-		cache = parametersOfPooling
-		
-		return outputFeatureMap, cache
-
 	#It is a naive implementation of backward pooling based on:
 	#https://leonardoaraujosantos.gitbooks.io/artificial-inteligence/content/pooling_layer.html
 	def doMaxPoolingOnlayerBackWard(self, pooledDeltaX, cache, xShape=None):
