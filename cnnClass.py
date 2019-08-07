@@ -39,7 +39,7 @@ class Layer:
 	'' @param initializationType, is the initialization function type of the weights and biases.
 	'' @param layerType, is the layer type, it can be Convolution and FullyConnected.
 	'' @param activationType, is the nonlinearity function type which contains the lyer.
-	'' @param weightSize, convention is [N,H,W,C].
+	'' @param weightSize, is the layer structure, the convention is when the layer convulutional [N,H,W,C], [K, C] when is fully connected.
 	'''
 	def __init__(
 		self,
@@ -85,23 +85,111 @@ class Layer:
 			raise Exception("Unhandled layer type: " + str(layerType))
 
 '''
-'' This is the class of CNN (convolutional neural network).
-'' The member variable of this class is the layers list.
-'' The elements of this list is instance of the Layer class.
-'' For example if we want to search the 20th kenrel at the 2nd layer, which is a convolution layer, 
-'' we call self.layers[1].weights[19], which is a 3D numpy.array.
+'' Representation a type of convulutional neural network and contains all the
+'' possible operations, for example forward and backpropagation.
+'' It stores the neural network layers in a list.
+''
+'' @author Nagy Marton
+'' @author Kisházi "janohhank" János
 '''
 class CNN:
+	# Neural network layers storage.
 	layers = []
-	def __init__(self, initializationType, layerTypeList, activationTypeList, weightSizeList):
-		numberOfLayers = len(layerTypeList)	#all lists in the arguments of this function have same number of elements.
-		for layer in range(numberOfLayers):
-			self.layers.append(Layer(layer, initializationType, layerTypeList[layer], activationTypeList[layer], weightSizeList[layer]))
 
-	
-	def __del__(self): 
-		print('Destructor called, CNN deleted.')
+	'''
+	'' Initialize a neural network.
+	'' @param initializationType, is the initialization function type.
+	'' @param layerTypeList, is the layers type of each layer.
+	'' @param activationTypeList, is the nonlinearity type of each layers.
+	'' @param weightSizeList, is each layer structure, by the convention is when convolutional [N,H,W,C], and  [K, C] when its fully connected.
+	'''
+	def __init__(
+		self,
+		initializationType,
+		layerTypeList,
+		activationTypeList,
+		weightSizeList
+	):
+		# All lists has to be the same number of elements.
+		numberOfLayers = len(layerTypeList)
+		for layerID in range(numberOfLayers):
+			self.layers.append(
+				Layer(
+					layer,
+					initializationType,
+					layerTypeList[layerID],
+					activationTypeList[layerID],
+					weightSizeList[layerID]
+				)
+			)
 
+	'''
+	'' Propagates the information forward to the output of CNN.
+	'' Creates a cache list which contains all usefull results during forward run of CNN.
+	'' For example if we want to find the 6th layer weights.lists, it seems like: cacheList[5]["Weights"]
+	'' @param X, is the input images list.
+	'''
+	def forward(self, X):
+		predictions = [None] * len(X)
+		# TODO we did not handle the batch list yet. The cacheList is not enough in this form if we use batch load in.
+		for img in range(len(X)):
+			# First input.
+			output = X[img]
+
+			cacheList = []
+			numberOfLAyers = len(self.layers)
+			for layerID in range(numberOfLAyers):
+				if(self.layers[layerID].layerType == "Convolution"):
+					cacheMap = {}
+
+					#print("BEFORE Padding:", output)
+					output, cache = self.doPaddingOnLayer(output, layerID)
+					cacheMap["Padding"] = cache
+					#print("AFTER Padding:", output)
+
+					#print("BEFORE CONV:", output)
+					output, cache = self.doConvolutionsOnLayer(output, layerID)
+					cacheMap["X"] = cache[0]
+					cacheMap["Weights"] = cache[1]
+					#print("AFTER CONV:", output)
+
+					#print("BEFORE CONV+bias:", output)
+					output, cache = self.doBiasAddOnLayer(output, layerID)
+					cacheMap["Biases"] = cache
+					cacheMap["Z"] = output # "Z" is the logits before activation function.
+					#print("AFTER CONV+bias:", output)
+
+					#print("BEFORE ACTIVATION:", output)
+					output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
+					cacheMap["Activations"] = output
+					#print("AFTER ACTIVATION:", output)
+
+					#print("BEFORE MaxPool:", output)
+					output, cache = self.doMaxPoolingOnlayer(output, 2, 2, 2, 2)
+					cacheMap["PoolParameters"] = cache
+					#print("AFTER MaxPool:", output)
+
+					cacheList.append(cacheMap)
+				# WARNING fully connected before a convolutional layer is not working, check this.
+				elif(self.layers[layerID].layerType == "FullyConnected"):
+					cacheMap = {}
+
+					#print("BEFORE FC:", output)
+					output, cache = self.doFullyConnectedOperationOnLayer(output, layerID)
+					cacheMap["X"] = cache[0]
+					cacheMap["Shape"] = cache[1]
+					cacheMap["Weights"] = cache[2]
+					cacheMap["Biases"] = cache[3]
+					cacheMap["Z"] = output
+					#print("AFTER FC:", output)
+
+					#print("BEFORE ACTIVATION:", output)
+					output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
+					#print("AFTER ACTIVATION:", output)
+
+					cacheList.append(cacheMap)
+			predictions[img] = output
+		return predictions, cacheList
 
 ########################################################################################################################
 ##Padding
@@ -505,61 +593,7 @@ class CNN:
 
 ########################################################################################################################
 #Forward and Backward
-	#This function get the input and propagate the information forward to the output of CNN.
-	#It is a pipeline. The output of each function is the input of the next one.
-	#A for cycle iterate over all layers.
-	#Create a list which cache all usefull results during forward run of CNN.
-	#For example if we want to find the 6th layer weights.lists, it seems like: cacheList[5]["Weights"]
-	#that is a list which each elements are a 3D numpy array.
-	def forward(self, X):
-		predictions = [None] * len(X)
-		#TODO: This for cycle is necessary because we did not handle the batch list yet
-		#The cacheList is not enough in this form if we use batch load in.
-		for img in range(len(X)):
-			cacheList = []
-			#first input
-			#it called output because later we will call the functions with these name.
-			output = X[img]
-			#For cycle to create the cnn pipeline.
-			numberOfLAyers = len(self.layers)
-			for layerID in range(numberOfLAyers):
-				if self.layers[layerID].layerType == "Convolution":
-					cacheMap = {}
-					#print("BEFORE Padding:", output)
-					output, cache = self.doPaddingOnLayer(output, layerID)
-					#print("AFTER Padding:", output)
-					cacheMap["Padding"] = cache
-					output, cache = self.doConvolutionsOnLayer(output, layerID)
-					#print("AFTER CONV:", output)
-					cacheMap["X"] = cache[0]
-					cacheMap["Weights"] = cache[1]
-					#if layerID == 1:
-						#print(cacheMap["Weights"][1])
-					output, cache = self.doBiasAddOnLayer(output, layerID)
-					cacheMap["Biases"] = cache
-					cacheMap["Z"] = output							#It is the logits before activation function.
-					#print("AFTER CONV+bias:", output)
-					output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
-					cacheMap["Activations"] = output
-					#print("AFTER SIGMOID:", output)
-					output, cache = self.doMaxPoolingOnlayer(output, 2, 2, 2, 2)
-					#print("AFTER MaxPool:", output)
-					cacheMap["PoolParameters"] = cache
-					cacheList.append(cacheMap)
-				elif self.layers[layerID].layerType == "FullyConnected":			#WARNING: fully connected before a convolutional layer is not working, check this.
-					cacheMap = {}
-					output, cache = self.doFullyConnectedOperationOnLayer(output, layerID)
-					#print("after FC:", output)
-					cacheMap["X"] = cache[0]
-					cacheMap["Shape"] = cache[1]
-					cacheMap["Weights"] = cache[2]
-					cacheMap["Biases"] = cache[3]
-					cacheMap["Z"] = output
-					cacheList.append(cacheMap)
-					output = self.doActivationFunctionOnLayer(output, self.layers[layerID].activationType)
-					#print("AFTER SM:", output)
-			predictions[img] = output
-		return predictions, cacheList
+
 
 
 
