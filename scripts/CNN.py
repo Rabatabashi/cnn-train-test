@@ -1,88 +1,11 @@
 #!/usr/bin/env python
 
-# TODO
-#
-# @author Nagy Marton
-# @author Kisházi "janohhank" János
-
 # Scientific computing library.
 import numpy
-
-'''
-'' Neural network layer abstraction class which can be a convolutional layer or a fully connected layer.
-'' Initialize the weights of the kernels and the bias vectors elements.
-''
-'' TODO This class need to move into another script (Layer.py)
-''
-'' @author Nagy Marton
-'' @author Kisházi "janohhank" János
-'''
-class Layer:
-	# The layer sequence number of neural network.
-	layerID = None
-
-	# The layer type, it can be Convolution or FullyConnected.
-	layerType = None
-
-	# The layer activation (nonlinearity) function type.
-	activationType = None
-
-	# Stored kernels weights map.
-	weights = {}
-
-	# Stored bias vectors map.
-	biases = {}
-
-	'''
-	'' Initialiaze a neural network layer elements and weights, biases.
-	'' @param layerID, is the identical number of the layer.
-	'' @param initializationType, is the initialization function type of the weights and biases.
-	'' @param layerType, is the layer type, it can be Convolution and FullyConnected.
-	'' @param activationType, is the nonlinearity function type which contains the lyer.
-	'' @param weightSize, is the layer structure, the convention is when the layer convulutional [N,H,W,C], [K, C] when is fully connected.
-	'''
-	def __init__(
-		self,
-		layerID,
-		initializationType,
-		layerType,
-		activationType,
-		weightSize
-	):
-		self.layerID = layerID
-		self.layerType = layerType
-		self.activationType = activationType
-
-		if(self.layerType == "Convolution"):
-			numberOfKernels = weightSize[0]
-			kernelHeight = weightSize[1]
-			kernelWidth = weightSize[2]
-			channels = weightSize[3]
-
-			# TODO put initialization into a function
-			if(initializationType == "UniformRandom"):
-				for kernelIdx in range(numberOfKernels):
-					self.weights[kernelIdx] = numpy.random.uniform(-0.01, +0.01, (kernelHeight, kernelWidth, channels))
-					self.weights[kernelIdx]= self.weights[kernelIdx].astype(dtype=numpy.float128)
-					self.biases[kernelIdx] = numpy.random.uniform(-0.01, +0.01, (1))
-					self.biases[kernelIdx]= self.biases[kernelIdx].astype(dtype=numpy.float128)
-			else:
-				raise Exception("Unhandled initialization type: " + str(initializationType))
-		elif(self.layerType == "FullyConnected"):
-			# TODO it must calculate instead of arbitrary give it.
-			lastFeatureMapSize = weightSize[0]
-			numberOfOutPut = weightSize[1]
-
-			# TODO put initialization into a function
-			if(initializationType == "UniformRandom"):
-				self.weights[0] = numpy.random.uniform(-0.01, +0.01, (lastFeatureMapSize, numberOfOutPut))
-				self.weights[0]= self.weights[0].astype(dtype=numpy.float128)
-				self.biases[0] = numpy.random.uniform(-0.01, +0.01, (numberOfOutPut))
-				self.biases[0]= self.biases[0].astype(dtype=numpy.float128)
-			else:
-				raise Exception("Unhandled initialization type: " + str(initializationType))
-		else:
-			raise Exception("Unhandled layer type: " + str(layerType))
+# Our Layer class import.
+import Layer from Layer
+# Our Utility class import.
+import Utility from Utility
 
 '''
 '' Representation a type of convulutional neural network and contains all the
@@ -315,7 +238,7 @@ class CNN:
 		typeOfNonlinearity = self.layers[layerID].activationType
 
 		# Gets the nonlinearity function.
-		activationFunction = self.getActivationFunction(typeOfNonlinearity)
+		activationFunction = Utility.getActivationFunction(typeOfNonlinearity)
 
 		# Use activation function on input feature map.
 		outputFeatureMap = activationFunction(inputFeatureMap)
@@ -453,75 +376,9 @@ class CNN:
 
 ########################################################################################################################
 ##Activations(/Nonlinearities) and their derivates (derivates are neccessary during backpropagation).
-	
-	#This function contains same activation functions then getActivationFunction()[below], but this function is not use lambdas.
-	def getActivationFunctionWithoutLambda(self, name, X):
-		if(name == "sigmoid"):
-			y = numpy.copy(X)
-			results = numpy.exp(y)/(1+numpy.exp(y))
-			return results
-		elif(name == "linear"):
-			return X
-		elif(name == "relu"):
-			y = numpy.copy(X)
-			y[y<0] = 0
-			return y
-		elif(name == "softmax"):
-			xx = numpy.copy(x)
-			y = numpy.exp(xx) / numpy.sum(numpy.exp(xx))
-			return y
-		else:
-			print('Unknown activation function. linear is used')
-			return lambda x: x
-		return
-
-	
-	#This function return the selected activation function.
-	#It is called by doActivationFunctionOnLayer() function.
-	def getActivationFunction(self, name):
-		if(name == "sigmoid"):
-			return lambda x : numpy.exp(x)/(1+numpy.exp(x))
-		elif(name == "linear"):
-			return lambda x : x
-		elif(name == "relu"):
-			def relu(x):
-				y = numpy.copy(x)
-				y[y<0] = 0
-				return y
-			return relu
-		elif(name == "softmax"):
-			def softmax(x):
-				xx = numpy.copy(x)
-				y = numpy.exp(xx) / numpy.sum(numpy.exp(xx))
-				return y
-			return softmax
-				
-		else:
-			print('Unknown activation function. linear is used')
-			return lambda x: x
     
     
-	#At the backpropagation we should use these functions instead of the original activation functions.
-	#These are the derivatives of the original ones.
-	def getDerivitiveActivationFunction(self, name):
-		if(name == "sigmoid"):
-			sig = lambda x : numpy.exp(x)/(1+numpy.exp(x))
-			return lambda x :sig(x)*(1-sig(x))
-		elif(name == "linear"):
-			return lambda x: 1
-		elif(name == "relu"):
-			def relu_diff(x):
-				y = numpy.copy(x)
-				y[y>=0] = 1
-				y[y<0] = 0
-				return y
-			return relu_diff
-		elif(name == "softmax"):
-			softmax = self.getActivationFunction('softmax')
-			return lambda x :softmax(x)*(1-softmax(x))		#NOTE: the description was different from it.
-		else:
-			print('Unknown activation function. linear is used')
-			return lambda x: 1
+	
 
 	#Select derivates of Nonlinearity (or Activation) function
 	#It is waiting the results of conv + bias (=logits) and return with the activation of the selected derivates of the nonlinearity.
@@ -529,7 +386,7 @@ class CNN:
 		
 		#Select the derivate funciton of current nonlinearity.
 		# d sigma(x) / dx, whgere sigma(x) is the activation function.
-		derivateOfActivationFunction = self.getDerivitiveActivationFunction(typeOfNonlinearity)
+		derivateOfActivationFunction = Utility.getDerivitiveActivationFunction(typeOfNonlinearity)
 		
 		#Use activation function on input feature map
 		outputFeatureMap = derivateOfActivationFunction(inputFeatureMap)

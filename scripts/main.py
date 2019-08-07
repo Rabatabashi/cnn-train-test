@@ -11,8 +11,8 @@ import argparse
 import numpy
 # Database provider library.
 import MNIST
-# Our Convulotional neural network abstraction.
-import cnnClass
+# Our convulotional neural network abstraction.
+import CNN from CNN
 
 parser = argparse.ArgumentParser(description="TODO")
 parser.add_argument("--mnistDir",required=True,type=str,help="The path of a directory which includes the MNIST files.")
