@@ -46,6 +46,8 @@ class CNN:
 				)
 			)
 
+	############################################    FORWARD    ############################################
+
 	'''
 	'' Propagates the information forward to the output of CNN.
 	'' Creates a cache list which contains all usefull results during forward run of CNN.
@@ -299,224 +301,42 @@ class CNN:
 
 		return outputVector, cache
 
-####################################### janohhank rework end line ######################################
-	#Backward convoltuion
-	#During backpropagation we need to propagate the errors of weights, biases and the inputActivation.
-	#This function determine these (dW, dB, dX) from delta, which comes from the next layer dX and the activation function of the current layer.
-	#The dX is just a numpy.array, but the dW and dB are stored in a list, which will be store (later in the code) another list.
-	def backwardConvolution(self, layerID, delta, cache):
-		
-		#Stored feature map
-		X = cache["X"]
-		
-		#Stored wights
-		W = cache["Weights"]
+	############################################    BACKPROPAGATION    ############################################
 
-		shapeOfAWeightKernel = W[0].shape
-		fH = shapeOfAWeightKernel[0]
-		fW = shapeOfAWeightKernel[1]
-		#fC = shapeOfAWeightKernel[2]
-
-		#NOTE: NN = N and CC = C, because pool decrease only the width and height of feature map
-		#NN, HH, WW, CC = delta.shape()
-		deltaShape = delta.shape
-		Hcurr = deltaShape[0]
-		Wcurr = deltaShape[1]
-		CC = deltaShape[2]
-		
-		#These list will be store the derivates of the weights and biases.
-		dWList = []
-		dBList = []
-		
-		dX = numpy.zeros(X.shape, dtype=numpy.float128)
-		
-		#Feature map sizes
-		countOfKernels = len(self.layers[layerID].weights)
-		for kernelIdx in range(countOfKernels):
-			#dE/dW
-			dW = numpy.zeros_like(self.layers[layerID].weights[kernelIdx], dtype=numpy.float128)	#NOTE: If all kernels are same this line can goto out from this for cycle.
-			#dE/dB
-			dB = numpy.zeros_like(self.layers[layerID].biases[kernelIdx], dtype=numpy.float128)	#NOTE: If all kernels are same this line can goto out from this for cycle.
-			for h in range(Hcurr):
-				for w in range(Wcurr):
-					dX[h:h+fH, w:w+fW, :] += W[kernelIdx] * delta[h,w,kernelIdx]	#Only thos elementsof dX accumulates, which contributed to delta[h,w,kernelIdx] elements.
-					dW += X[h:h+fH, w:w+fW, :] * delta[h,w,kernelIdx]
-					dB += delta[h,w,kernelIdx]
-			dWList.append(dW)
-			dBList.append(dB)
-		
-		
-		return dX, dWList, dBList
-
-	#Backward Fully Conected layer
-	#Determine the dX, dW, dB (mentioned above at the backwardConvolution()). The store of outputs 
-	def backwardFullyConnected(self, layerID, delta, cache):
-		
-		#Stored feature map (it is an 1D)
-		X = cache["X"]
-		#Stored wights
-		W = cache["Weights"]
-		
-		#These list will be store the derivates of the weights and biases.
-		dWList = []
-		dBList = []
-		
-		dW = numpy.outer(X, delta)
-		dW= dW.astype(dtype=numpy.float128)
-		dB = delta
-		dB= dB.astype(dtype=numpy.float128)
-		
-		dX = numpy.dot(W[0], delta)
-		dX= dX.astype(dtype=numpy.float128)
-		
-		dWList.append(dW)
-		dBList.append(dB)
-		
-		return dX, dWList, dBList
-
-########################################################################################################################
-##Activations(/Nonlinearities) and their derivates (derivates are neccessary during backpropagation).
-    
-    
-	
-
-	#Select derivates of Nonlinearity (or Activation) function
-	#It is waiting the results of conv + bias (=logits) and return with the activation of the selected derivates of the nonlinearity.
-	def doDerivateOfActivationFunctionOnLayer(self, inputFeatureMap, typeOfNonlinearity):
-		
-		#Select the derivate funciton of current nonlinearity.
-		# d sigma(x) / dx, whgere sigma(x) is the activation function.
-		derivateOfActivationFunction = Utility.getDerivitiveActivationFunction(typeOfNonlinearity)
-		
-		#Use activation function on input feature map
-		outputFeatureMap = derivateOfActivationFunction(inputFeatureMap)
-
-		return outputFeatureMap
-	
-
-########################################################################################################################
-#Poolings
-	#It is a naive implementation of backward pooling based on:
-	#https://leonardoaraujosantos.gitbooks.io/artificial-inteligence/content/pooling_layer.html
-	def doMaxPoolingOnlayerBackWard(self, pooledDeltaX, cache, xShape=None):
-		
-		#shape of the output feature map. This is the backpropagated error tensor.
-		#It contain the error of next feature map and the derivates of the nonlinearity(wrt the logits)
-		if not (xShape is None):
-			#if the delta come from a fully connected it is a 1D vector
-			#Reshape it into 3D tensor
-			pooledDeltaX = numpy.reshape(pooledDeltaX, (xShape))
-			#(Hcurr, Wcurr, Ccurr) = delta.shape
-			#NOTE: NN = N and CC = C, because pool decrease only the width and height of feature map
-			#NN, HH, WW, CC = pooledDeltaX.shape()
-			pooledDeltaXShape = pooledDeltaX.shape
-			HH = pooledDeltaXShape[0]
-			WW = pooledDeltaXShape[1]
-			CC = pooledDeltaXShape[2]
-		else:
-			#The delta come from convoluton
-			#NOTE: NN = N and CC = C, because pool decrease only the width and height of feature map
-			#NN, HH, WW, CC = pooledDeltaX.shape()
-			pooledDeltaXShape = pooledDeltaX.shape
-			HH = pooledDeltaXShape[0]
-			WW = pooledDeltaXShape[1]
-			CC = pooledDeltaXShape[2]
-		
-		
-		unpooledX = cache["Activations"]
-		parametersOfPooling = cache["PoolParameters"]
-		
-		#N is the batchSize.
-		#H, W, C is the height width channels of feature map which was pooled.
-		#N, H, W, C = unpooledX.shape()
-		unpooledShape = unpooledX.shape
-		H = unpooledShape[0]
-		W = unpooledShape[1]
-		C = unpooledShape[2]
-		
-		stride = parametersOfPooling["stride"]
-		fHeight = parametersOfPooling["poolingFilterHeight"]
-		fWidth = parametersOfPooling["poolingFilterWidth"]
-
-		unPooledDeltaX = numpy.zeros_like(unpooledX, dtype=numpy.float128)
-		
-		#for n in range(N):
-		for c in range(C):
-			for y in range(HH):
-				for x in range(WW):
-					xSlice = unpooledX[y*stride:y*stride+fHeight, x*stride:x*stride+fWidth, c]
-					xSlice = numpy.squeeze(xSlice)
-					#Select thos i,j which is (/are) the maximal values of input, we propagates only those errors.
-					selectMax = numpy.where(xSlice >= numpy.amax(xSlice), 1, 0)
-					
-					unPooledDeltaX[y*stride:y*stride+fHeight, x*stride:x*stride+fWidth, c] = selectMax * pooledDeltaX[y,x,c]
-		return unPooledDeltaX
-
-########################################################################################################################
-##Loss function
-	#This loss function compute the absolute value of loss
-	def lossFunction(self, output, target):
-		#target is a scalaer betweeen 0 and 9
-		#we transfrom this scalar into a binary vector with 10 elements.
-		targetVector = numpy.zeros(len(output), dtype=numpy.float128)
-		targetVector[target-1] = 1.0
-		print(output)
-		print(targetVector)
-
-		loss = numpy.sum(numpy.absolute(numpy.subtract(output, targetVector)))
-		return loss
-
-########################################################################################################################
-##Gradients of Weights and Biases Summarizer
-	#This function sume up dWs and dBs for images (in a batch)
-	def doWeightsAndBiasSum(self, dWAll, dBAll, dWImg ,dBImg):
-		numberOfLayers = len(self.layers)
-		for layerID in range(numberOfLayers):
-			kernelCounts = len(self.layers[layerID].weights)
-			for kernelIdx in range(kernelCounts):
-				dWAll[layerID][kernelIdx] = numpy.add(dWAll[layerID][kernelIdx], dWImg[layerID][kernelIdx])
-				dBAll[layerID][kernelIdx] = numpy.add(dBAll[layerID][kernelIdx], dBImg[layerID][kernelIdx])
-		return dWAll, dBAll
-
-
-########################################################################################################################
-#Forward and Backward
-
-
-
-
-
-	#backpropagation
-	#This is a pipeline similar to forward run.
-	#In this case we propagate the errors from at the end of cnn to the inputs.
-	#The propagation happened with a method which called chain rule. It is a chan if derivates.
+	'''
+	'' Backpropagates the information into the neural network and refine the weights, biases.
+	'' The propagation process used a algorithm which called chain rule which is a chan of derivates.
+	'' @param predictions, the prediction vector.
+	'' @param target, the expected output vector.
+	'' @param cacheList, the forward results cahce list.
+	'''
 	def backpropagation(self, predictions, target, cacheList):
 		numberOfLayers = len(self.layers)
 		dWAll = [None] * numberOfLayers
 		dBAll = [None] * numberOfLayers
-		
+
+		# TODO this for cycle is necessary because we did not handle the batch list yet
 		totalLoss = 0
-		#TODO: This for cycle is necessary because we did not handle the batch list yet
 		for img in range(len(target)):
 			currTarget = target[img]
 			currentPrediction = predictions[img]
-			#print(currentPrediction)
-			#print(currTarget)
+
 			loss = self.lossFunction(currentPrediction, currTarget)
-			
-			print(loss)
-			
-			#deltas = dE/dZ  it is the error for each layer
+
+			print("[" + __file__ + "]" + "[INFO]" + " Current loss is: ",loss)
+
+			# The deltas is the error for each layer (dE/dZ).
 			deltas = [None] * numberOfLayers
-			deltas[-1] = (loss)*(self.doDerivateOfActivationFunctionOnLayer((cacheList[-1]["Z"]), self.layers[-1].activationType))
+			# TODO why -1 is the layerID?
+			deltas[-1] = (loss)*(self.doDerivateOfActivationFunctionOnLayer((cacheList[-1]["Z"]), -1))
 
 			dWImg = [None] * numberOfLayers
 			dBImg = [None] * numberOfLayers
-
 			for layerID in reversed(range(numberOfLayers)):
-				if self.layers[layerID].layerType == "Convolution":
-					#Check that the following layer after convolution is a fully connected
-					if self.layers[layerID + 1].layerType == "FullyConnected":
+				layerType = self.layers[layerID].layerType
+				if(layerType == "Convolution"):
+					# Check that the following layer after convolution is a fully connected.
+					if(self.layers[layerID + 1].layerType == "FullyConnected"):
 						xShape = cacheList[layerID + 1]["Shape"]
 						dXLayer = self.doMaxPoolingOnlayerBackWard(deltas[layerID+1], cacheList[layerID], xShape)
 						dXLayer, dWLayer, dBLayer = self.backwardConvolution(layerID, dXLayer, cacheList[layerID])
@@ -527,34 +347,230 @@ class CNN:
 						dXLayer, dWLayer, dBLayer = self.backwardConvolution(layerID, dXLayer, cacheList[layerID])
 						padding = cacheList[layerID]["Padding"]
 						dXLayer = dXLayer[padding:-padding, padding:-padding]	#decrease the size of feature map with paddings
-					#dX and the derivates of the nonlinearity have same shapes.
-					deltas[layerID] = dXLayer * (self.doDerivateOfActivationFunctionOnLayer((cacheList[layerID]["Z"]), self.layers[layerID].activationType))
+					# dX and the derivates of the nonlinearity have same shapes.
+					deltas[layerID] = dXLayer * (self.doDerivateOfActivationFunctionOnLayer((cacheList[layerID]["Z"]), layerID))
 					dWImg[layerID] = dWLayer
 					dBImg[layerID] = dBLayer
-				elif self.layers[layerID].layerType == "FullyConnected":
-					if layerID == (numberOfLayers - 1):
-						startDelta = (loss)*(self.doDerivateOfActivationFunctionOnLayer((cacheList[layerID]["Z"]), self.layers[layerID].activationType))
+				elif(layerType == "FullyConnected"):
+					if(layerID == (numberOfLayers - 1)):
+						startDelta = (loss)*(self.doDerivateOfActivationFunctionOnLayer((cacheList[layerID]["Z"]), layerID))
 						dXLayer, dWLayer, dBLayer = self.backwardFullyConnected(layerID, startDelta, cacheList[layerID])
-						#dX and the derivates of the nonlinearity have same shapes.
+						# dX and the derivates of the nonlinearity have same shapes.
 						deltas[layerID] = dXLayer
 					else:
 						dXLayer, dWLayer, dBLayer = self.backwardFullyConnected(layerID, deltas[layerID+1], cacheList[layerID])
-						#dX and the derivates of the nonlinearity have same shapes.
-						deltas[layerID] = dXLayer * (self.doDerivateOfActivationFunctionOnLayer((cacheList[layerID]["Z"]), self.layers[layerID].activationType))
+						# dX and the derivates of the nonlinearity have same shapes.
+						deltas[layerID] = dXLayer * (self.doDerivateOfActivationFunctionOnLayer((cacheList[layerID]["Z"]), layerID))
 					dWImg[layerID] = dWLayer
 					dBImg[layerID] = dBLayer
+				else:
+					raise Exception("Unhandled layer type: " + str(layerType))
+
 			totalLoss += loss
 			if img == 0:
 				dWAll = dWImg
 				dBAll = dBImg
 			else:
 				dWAll, dBAll = self.doWeightsAndBiasSum(dWAll, dBAll, dWImg ,dBImg)
-			
+
 		return dWAll, dBAll, totalLoss
 
-########################################################################################################################
-##Weights and Biases UPDATES
-	#This function updates the weights and biases depending on learning rate and determined dW and dB.
+	'''
+	'' Sums of gradients of weights and biases.
+	'' This function sums up dWs and dBs for images (in a batch).
+	'' @param dWAll, TODO
+	'' @param dBAll, TODO
+	'' @param dWImg, TODO
+	'' @param dBImg, TODO
+	'''
+	def doWeightsAndBiasSum(self, dWAll, dBAll, dWImg ,dBImg):
+		numberOfLayers = len(self.layers)
+		for layerID in range(numberOfLayers):
+			kernelCounts = len(self.layers[layerID].weights)
+			for kernelIdx in range(kernelCounts):
+				dWAll[layerID][kernelIdx] = numpy.add(dWAll[layerID][kernelIdx], dWImg[layerID][kernelIdx])
+				dBAll[layerID][kernelIdx] = numpy.add(dBAll[layerID][kernelIdx], dBImg[layerID][kernelIdx])
+		return dWAll, dBAll
+
+	'''
+	'' Does a backward convolution operation.
+	'' During backpropagation we need to propagate the errors of weights, biases and the inputActivation.
+	'' This function determine these (dW, dB, dX) from delta, which comes from the next layer dX and the activation function of the current layer.
+	'' TODO the dX is just a numpy.array, but the dW and dB are stored in a list, which will be store (later in the code) another list.
+	'' @param layerID, is the current layer ID.
+	'' @param delta, TODO
+	'' @param cache, is the cache list result from a forward.
+	'''
+	def backwardConvolution(self, layerID, delta, cache):
+		# Cahce stored feature map.
+		X = cache["X"]
+		# Cache stored weights.
+		W = cache["Weights"]
+
+		shapeOfAWeightKernel = W[0].shape
+		fH = shapeOfAWeightKernel[0]
+		fW = shapeOfAWeightKernel[1]
+		fC = shapeOfAWeightKernel[2]
+
+		# NOTE NN = N and CC = C, because pool decrease only the width and height of feature map.
+		deltaShape = delta.shape
+		Hcurr = deltaShape[0]
+		Wcurr = deltaShape[1]
+		CC = deltaShape[2]
+
+		# These lists will be store the derivates of the weights and biases.
+		dWList = []
+		dBList = []
+
+		dX = numpy.zeros(X.shape, dtype=numpy.float128)
+
+		countOfKernels = len(self.layers[layerID].weights)
+		for kernelIdx in range(countOfKernels):
+			# dE/dW
+			dW = numpy.zeros_like(self.layers[layerID].weights[kernelIdx], dtype=numpy.float128)	#NOTE: If all kernels are same this line can goto out from this for cycle.
+			# dE/dB
+			dB = numpy.zeros_like(self.layers[layerID].biases[kernelIdx], dtype=numpy.float128)	#NOTE: If all kernels are same this line can goto out from this for cycle.
+			for h in range(Hcurr):
+				for w in range(Wcurr):
+					dX[h:h+fH, w:w+fW, :] += W[kernelIdx] * delta[h,w,kernelIdx]	#Only thos elementsof dX accumulates, which contributed to delta[h,w,kernelIdx] elements.
+					dW += X[h:h+fH, w:w+fW, :] * delta[h,w,kernelIdx]
+					dB += delta[h,w,kernelIdx]
+			dWList.append(dW)
+			dBList.append(dB)
+
+		return dX, dWList, dBList
+
+	'''
+	'' Does a backward fully conected operation on the layer.
+	'' This function determine these (dW, dB, dX) from delta, which comes from the next layer dX and the activation function of the current layer.
+	'' @param layerID, is the current layer ID.
+	'' @param delta, TODO
+	'' @param cache, is the cache list result from a forward.
+	'''
+	def backwardFullyConnected(self, layerID, delta, cache):
+		# Cahce stored feature map (now its 1D).
+		X = cache["X"]
+		# Cache stored weights.
+		W = cache["Weights"]
+
+		# These lists will be store the derivates of the weights and biases.
+		dWList = []
+		dBList = []
+
+		dW = numpy.outer(X, delta)
+		dW = dW.astype(dtype=numpy.float128)
+		dB = delta
+		dB = dB.astype(dtype=numpy.float128)
+
+		dX = numpy.dot(W[0], delta)
+		dX = dX.astype(dtype=numpy.float128)
+
+		dWList.append(dW)
+		dBList.append(dB)
+
+		return dX, dWList, dBList
+
+	'''
+	'' Use the derivate of the activation function (nonlinearity funtcion) on a layer.
+	'' @param inputFeatureMap, is the input feature map (3D tensor).
+	'' @param layerID, is the current layer ID.
+	'''
+	def doDerivateOfActivationFunctionOnLayer(self, inputFeatureMap, layerID):
+		typeOfNonlinearity = self.layers[layerID].activationType)
+
+		# Selects the derivate function of the current nonlinearity.
+		derivateOfActivationFunction = Utility.getDerivitiveActivationFunction(typeOfNonlinearity)
+
+		# Use activation function on the input feature map.
+		outputFeatureMap = derivateOfActivationFunction(inputFeatureMap)
+
+		return outputFeatureMap
+
+	'''
+	'' Does a backward max-pooling on a layer.
+	'' This is a naive implementation of backward pooling based on:
+	'' https://leonardoaraujosantos.gitbooks.io/artificial-inteligence/content/pooling_layer.html.
+	'' @param pooledDeltaX, TODO
+	'' @param cache, is the cache list result from a forward.
+	'' @param xShape, TODO
+	'''
+	def doMaxPoolingOnlayerBackWard(self, pooledDeltaX, cache, xShape=None):
+		# Shape of the output feature map. This is the backpropagated error tensor.
+		# It contains the error of next feature map and the derivates of the nonlinearity(wrt the logits).
+
+		# If the delta come from a fully connected it is a 1D vector
+		if(xShape is not None):
+			# Reshape it into 3D tensor.
+			pooledDeltaX = numpy.reshape(pooledDeltaX, (xShape))
+			# (Hcurr, Wcurr, Ccurr) = delta.shape
+			# NOTE NN = N and CC = C, because pool decrease only the width and height of feature map.
+			# NN, HH, WW, CC = pooledDeltaX.shape()
+			pooledDeltaXShape = pooledDeltaX.shape
+			HH = pooledDeltaXShape[0]
+			WW = pooledDeltaXShape[1]
+			CC = pooledDeltaXShape[2]
+		# The delta come from convoluton.
+		else:
+			# NOTE: NN = N and CC = C, because pool decrease only the width and height of feature map.
+			# NN, HH, WW, CC = pooledDeltaX.shape()
+			pooledDeltaXShape = pooledDeltaX.shape
+			HH = pooledDeltaXShape[0]
+			WW = pooledDeltaXShape[1]
+			CC = pooledDeltaXShape[2]
+
+		unpooledX = cache["Activations"]
+		parametersOfPooling = cache["PoolParameters"]
+
+		# N is the batchSize.
+		# H, W, C is the height width channels of feature map which was pooled.
+		# N, H, W, C = unpooledX.shape()
+		unpooledShape = unpooledX.shape
+		H = unpooledShape[0]
+		W = unpooledShape[1]
+		C = unpooledShape[2]
+
+		stride = parametersOfPooling["stride"]
+		fHeight = parametersOfPooling["poolingFilterHeight"]
+		fWidth = parametersOfPooling["poolingFilterWidth"]
+
+		unPooledDeltaX = numpy.zeros_like(unpooledX, dtype=numpy.float128)
+
+		for c in range(C):
+			for y in range(HH):
+				for x in range(WW):
+					xSlice = unpooledX[y*stride:y*stride+fHeight, x*stride:x*stride+fWidth, c]
+					xSlice = numpy.squeeze(xSlice)
+					# Select those i,j which is/are the maximal values of input, we propagates only those errors.
+					selectMax = numpy.where(xSlice >= numpy.amax(xSlice), 1, 0)
+
+					unPooledDeltaX[y*stride:y*stride+fHeight, x*stride:x*stride+fWidth, c] = selectMax * pooledDeltaX[y,x,c]
+		return unPooledDeltaX
+
+	############################################    TRAIN    ############################################
+
+	'''
+	'' Computes the absolute value of loss
+	'' @param output, the neural network output.
+	'' @param target, the expected output.
+	'''
+	def lossFunction(self, output, target):
+		# Target is a scalar betweeen 0 and 9. We transfrom this scalar into a binary vector with 10 elements.
+		targetVector = numpy.zeros(len(output), dtype=numpy.float128)
+		targetVector[target-1] = 1.0
+
+		print("[" + __file__ + "]" + "[INFO]" + " CNN output vector is: ",output)
+		print("[" + __file__ + "]" + "[INFO]" + " Target vector is: ",targetVector)
+
+		loss = numpy.sum(numpy.absolute(numpy.subtract(output, targetVector)))
+
+		return loss
+
+	'''
+	'' Updates the weights and biases depending on current learning rate and determined dW and dB.
+	'' @param dW, TODO
+	'' @param dB, TODO
+	'' @param lr, TODO
+	'''
 	def doUpdateWeightsAndBiases(self, dW, dB, lr):
 		numberOfLayers = len(self.layers)
 		for layerID in range(numberOfLayers):
@@ -563,33 +579,35 @@ class CNN:
 				self.layers[layerID].weights[kernelIdx] = numpy.subtract(self.layers[layerID].weights[kernelIdx], (lr * dW[layerID][kernelIdx]))
 				self.layers[layerID].biases[kernelIdx] = numpy.subtract(self.layers[layerID].biases[kernelIdx], (lr * dB[layerID][kernelIdx]))
 
-
-########################################################################################################################
-##TRAIN
-	#This is the train function which will be called at the main.
-	#This function call all functions which call the lower level ones.
-	#train() function load the input image into a batch which contains only 1 image per batch now (the higher batchsize is not working yet.).
-	#the loaded batch go through the cnn and the caches and outputs generated.
-	#Those results are the inputs of backpropagation() function which determine the delta Weights and delta biases.
-	#And after update those wights.
-	#NOTE in the first try we use batch size = 1
-	def train(self, x, y, batchSize=1, numberOfEpochs=100, lr = 0.001):
-		numberOfAllImages = len(x)
+	'''
+	'' Trains the initialized neural network, updates the weights and biases of the layers.
+	'' TODO batch of images not working currently.
+	'' @param inputImages, is the train images.
+	'' @param inputLabels, is the train labels for images.
+	'' @param batchSize, is the train batch size.
+	'' @param numberOfEpochs, is the train epoch size.
+	'' @param learningRate, is the defined learning rate.
+	'''
+	def train(self, inputImages, inputLabels, batchSize=1, numberOfEpochs=100, learningRate = 0.001):
+		numberOfAllImages = len(inputImages)
 		for epoch in range(numberOfEpochs):
 			totalLoss = 0
+
 			numberOfBatches = int(numpy.ceil(numberOfAllImages / batchSize))
-			print(numberOfBatches)
 			for batch in range(numberOfBatches):
-				if batch == numberOfBatches:
+				if(batch == numberOfBatches):
 					batchSize = (numberOfAllImages - ((batch - 1) * batchSize))
-					batchX = x[batch:batch+batchSize]
-					batchY = y[batch:batch+batchSize]
+					batchX = inputImages[batch:batch+batchSize]
+					batchY = inputLabels[batch:batch+batchSize]
 				else:
-					batchX = x[batch:batch+batchSize]
-					batchY = y[batch:batch+batchSize]
+					batchX = inputImages[batch:batch+batchSize]
+					batchY = inputLabels[batch:batch+batchSize]
+
 				prediction, cacheList = self.forward(batchX)
 				dW, dB, loss = self.backpropagation(prediction, batchY, cacheList)
-				self.doUpdateWeightsAndBiases(dW, dB, lr)
+				self.doUpdateWeightsAndBiases(dW, dB, learningRate)
+
 				totalLoss += loss
 			cost = (totalLoss/numberOfBatches)
-			print("[", epoch, "] epoch ", "average cost ",  cost)
+
+			print("[" + __file__ + "]" + "[INFO]" + " Epoch",epoch,"average cost is",cost)
