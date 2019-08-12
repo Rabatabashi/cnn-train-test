@@ -21,10 +21,10 @@ class Layer:
 	activationType = None
 
 	# Stored kernels weights map.
-	weights = {}
+	weights = None
 
 	# Stored bias vectors map.
-	biases = {}
+	biases = None
 
 	'''
 	'' Initialiaze a neural network layer elements and weights, biases.
@@ -45,6 +45,8 @@ class Layer:
 		self.layerID = layerID
 		self.layerType = layerType
 		self.activationType = activationType
+		self.weights = {}
+		self.biases = {}
 
 		if(self.layerType == "Convolution"):
 			numberOfKernels = weightSize[0]
@@ -56,9 +58,9 @@ class Layer:
 			if(initializationType == "UniformRandom"):
 				for kernelIdx in range(numberOfKernels):
 					self.weights[kernelIdx] = numpy.random.uniform(-0.01, +0.01, (kernelHeight, kernelWidth, channels))
-					self.weights[kernelIdx]= self.weights[kernelIdx].astype(dtype=numpy.float128)
+					self.weights[kernelIdx] = self.weights[kernelIdx].astype(dtype=numpy.float128)
 					self.biases[kernelIdx] = numpy.random.uniform(-0.01, +0.01, (1))
-					self.biases[kernelIdx]= self.biases[kernelIdx].astype(dtype=numpy.float128)
+					self.biases[kernelIdx] = self.biases[kernelIdx].astype(dtype=numpy.float128)
 			else:
 				raise Exception("Unhandled initialization type: " + str(initializationType))
 		elif(self.layerType == "FullyConnected"):
@@ -69,9 +71,9 @@ class Layer:
 			# TODO put initialization into a function
 			if(initializationType == "UniformRandom"):
 				self.weights[0] = numpy.random.uniform(-0.01, +0.01, (lastFeatureMapSize, numberOfOutPut))
-				self.weights[0]= self.weights[0].astype(dtype=numpy.float128)
+				self.weights[0] = self.weights[0].astype(dtype=numpy.float128)
 				self.biases[0] = numpy.random.uniform(-0.01, +0.01, (numberOfOutPut))
-				self.biases[0]= self.biases[0].astype(dtype=numpy.float128)
+				self.biases[0] = self.biases[0].astype(dtype=numpy.float128)
 			else:
 				raise Exception("Unhandled initialization type: " + str(initializationType))
 		else:

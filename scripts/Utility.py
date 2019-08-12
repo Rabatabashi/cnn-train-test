@@ -6,8 +6,6 @@ import numpy
 '''
 '' Stores the static methods which used in the CNN.
 ''
-'' TODO This class need to move into another script (Utility.py)
-''
 '' @author Nagy Marton
 '' @author Kishazi "janohhank" Janos
 '''
@@ -17,7 +15,7 @@ class Utility:
 	'' @param activationFunctionType, is the name of the activation function.
 	'''
 	@staticmethod
-	def getActivationFunction(self, activationFunctionType):
+	def getActivationFunction(activationFunctionType):
 		if(activationFunctionType == "sigmoid"):
 			return lambda x : numpy.exp(x)/(1 + numpy.exp(x))
 		elif(activationFunctionType == "linear"):
@@ -42,7 +40,7 @@ class Utility:
 	'' @param activationFunctionType, is the name of the activation function.
 	'''
 	@staticmethod
-	def getDerivitiveActivationFunction(self, activationFunctionType):
+	def getDerivitiveActivationFunction(activationFunctionType):
 		if(activationFunctionType == "sigmoid"):
 			sig = lambda x : numpy.exp(x)/(1 + numpy.exp(x))
 			return lambda x :sig(x)*(1-sig(x))

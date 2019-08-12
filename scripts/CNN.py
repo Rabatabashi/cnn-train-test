@@ -140,7 +140,7 @@ class CNN:
 		# NOTE we handle only symmetric kernels now, later it will be different aspect ratio too.
 		kernelSizes = fH
 
-		#NOTE we use one kernel strides, later it will be a parameters too.
+		# NOTE we use one kernel strides, later it will be a parameters too.
 		kernelStride = 1
 
 		shapeOfFeatureMap = inputFeatureMap.shape
@@ -224,7 +224,7 @@ class CNN:
 
 		outputDepth = len(self.layers[layerID].biases)
 		for kernelIdx in range(outputDepth):
-			outputFeatureMap[:,:,kernelIdx] = inputFeatureMdoMaxPoolingOnlayerap[:,:,kernelIdx] + self.layers[layerID].biases[kernelIdx]
+			outputFeatureMap[:,:,kernelIdx] = inputFeatureMap[:,:,kernelIdx] + self.layers[layerID].biases[kernelIdx]
 
 		# For the backpropagation we need to store the input and bias vectors.
 		cache = self.layers[layerID].biases.copy()
@@ -240,7 +240,7 @@ class CNN:
 		typeOfNonlinearity = self.layers[layerID].activationType
 
 		# Gets the nonlinearity function.
-		activationFunction = Utility.getActivationFunction(typeOfNonlinearity)
+		activationFunction = Utility.Utility.getActivationFunction(typeOfNonlinearity)
 
 		# Use activation function on input feature map.
 		outputFeatureMap = activationFunction(inputFeatureMap)
@@ -479,7 +479,7 @@ class CNN:
 		typeOfNonlinearity = self.layers[layerID].activationType
 
 		# Selects the derivate function of the current nonlinearity.
-		derivateOfActivationFunction = Utility.getDerivitiveActivationFunction(typeOfNonlinearity)
+		derivateOfActivationFunction = Utility.Utility.getDerivitiveActivationFunction(typeOfNonlinearity)
 
 		# Use activation function on the input feature map.
 		outputFeatureMap = derivateOfActivationFunction(inputFeatureMap)
