@@ -7,7 +7,7 @@ import numpy
 '' Neural network layer abstraction class which can be a convolutional layer or a fully connected layer.
 '' Initialize the weights of the kernels and the bias vectors elements.
 ''
-'' @author Nagy Marton
+'' @author Nagy "rabatabashi" Marton
 '' @author Kishazi "janohhank" Janos
 '''
 class Layer:
@@ -86,4 +86,4 @@ class Layer:
 	'' TODO DOC
 	'''
 	def xavierInitialization(self, weightSize):
-		
+		print("asd")

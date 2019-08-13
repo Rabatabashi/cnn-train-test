@@ -2,7 +2,7 @@
 
 # Loads the mnist images and labels and trains a fully connected neural network with multiple layers.
 #
-# @author Nagy Marton
+# @author Nagy "rabatabashi" Marton
 # @author Kishazi "janohhank" Janos
 
 # This module provides a portable way of using operating system dependent functionality.

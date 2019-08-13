@@ -12,7 +12,7 @@ import Utility
 '' possible operations, for example forward and backpropagation.
 '' It stores the neural network layers in a list.
 ''
-'' @author Nagy Marton
+'' @author Nagy "rabatabashi" Marton
 '' @author Kishazi "janohhank" Janos
 '''
 class CNN:

@@ -6,7 +6,7 @@ import numpy
 '''
 '' Stores the static methods which used in the CNN.
 ''
-'' @author Nagy Marton
+'' @author Nagy "rabatabashi" Marton
 '' @author Kishazi "janohhank" Janos
 '''
 class Utility:

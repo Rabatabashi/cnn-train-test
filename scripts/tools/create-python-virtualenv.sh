@@ -1,21 +1,42 @@
 #!/bin/bash
+
 # This bash script create a virtual environment for the cnn-train-test project.
 # It is installing all necessary modules for project.
-# Correct usage of this script is: /PATH-TO-THE-DIRECTORY-OF-THIS-SCRIPT/create-python-virtual-environment-to-this-project.sh <PATH-TO-VIRTUAL-ENV-DIR>
+#
+# @author Kisházi "janohhank" János
+# @author Nagy "rabatabashi" Márton
 
+declare -r SELFDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-#The first command line arguments after the name of script is the path where we want to create the virtual environment.
-VIRTUAL_ENV_DIR=$1
+function usage(){
+	echo "$0 VIRTUALENV-DIR TF-TYPE"
+	echo -e "\t VIRTUALENV-DIR is the target directory path where will the virtualenv created."
+}
 
-#Create a python3 virtual environment
-python3 -m venv $VIRTUAL_ENV_DIR
-source $VIRTUAL_ENV_DIR/bin/activate
+if [ $# -ne 1 ]; then
+	usage
+	exit 1
+fi
 
-#necessary modules
-pip install numpy
-pip install python-mnist
-pip install argparse
+declare -r VIRTUALENV_DIR="$1"
 
-# After this program finished you can run "source VIRTUAL_ENV_DIR/bin/activate" command and the terminal will be entering to the virtual environment which created by this script.
-echo "You can enter to the cnn-train-test virtual-environment, with the following(next line) command:"
-echo "source $VIRTUAL_ENV_DIR/bin/activate"
+if [ ! -d "$VIRTUALENV_DIR" ]; then
+	echo "[$0][ERROR] The VIRTUALENV_DIR does not denote a directory: $VIRTUALENV_DIR!"
+	exit 1
+fi
+
+if [ ! -x "$(command -v virtualenv)" ]; then
+	echo "[$0][ERROR] virtualenv missing!"
+	exit 1
+fi
+
+declare -r VIRTUALENV_PATH="$VIRTUALENV_DIR"/virtualenv-cnn-train-test
+echo "[$0][INFO] Setting up virtualenv into $VIRTUALENV_PATH."
+
+virtualenv -p python3 "$VIRTUALENV_PATH"
+source "$VIRTUALENV_PATH"/bin/activate
+cd "$VIRTUALENV_PATH"/bin
+python pip install --upgrade numpy argparse python-mnist
+cd "$SELFDIR"
+
+echo "[$0][INFO] Virtualenv setup is done."
