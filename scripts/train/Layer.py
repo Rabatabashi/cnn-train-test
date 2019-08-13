@@ -48,33 +48,42 @@ class Layer:
 		self.weights = {}
 		self.biases = {}
 
+		if(initializationType == "UniformRandom"):
+			self.simpleUniformInitialization(weightSize)
+		elif(initializationType == "Xavier"):
+			self.xavierInitialization(weightSize)
+		else:
+			raise Exception("Unhandled initialization type: " + str(initializationType))
+
+	'''
+	'' TODO DOC
+	'''
+	def simpleUniformInitialization(self, weightSize):
 		if(self.layerType == "Convolution"):
 			numberOfKernels = weightSize[0]
 			kernelHeight = weightSize[1]
 			kernelWidth = weightSize[2]
 			channels = weightSize[3]
 
-			# TODO put initialization into a function
-			if(initializationType == "UniformRandom"):
-				for kernelIdx in range(numberOfKernels):
-					self.weights[kernelIdx] = numpy.random.uniform(-0.01, +0.01, (kernelHeight, kernelWidth, channels))
-					self.weights[kernelIdx] = self.weights[kernelIdx].astype(dtype=numpy.float128)
-					self.biases[kernelIdx] = numpy.random.uniform(-0.01, +0.01, (1))
-					self.biases[kernelIdx] = self.biases[kernelIdx].astype(dtype=numpy.float128)
-			else:
-				raise Exception("Unhandled initialization type: " + str(initializationType))
+			for kernelIdx in range(numberOfKernels):
+				self.weights[kernelIdx] = numpy.random.uniform(-0.01, +0.01, (kernelHeight, kernelWidth, channels))
+				self.weights[kernelIdx] = self.weights[kernelIdx].astype(dtype=numpy.float128)
+				self.biases[kernelIdx] = numpy.random.uniform(-0.01, +0.01, (1))
+				self.biases[kernelIdx] = self.biases[kernelIdx].astype(dtype=numpy.float128)
 		elif(self.layerType == "FullyConnected"):
 			# TODO it must calculate instead of arbitrary give it.
 			lastFeatureMapSize = weightSize[0]
 			numberOfOutPut = weightSize[1]
 
-			# TODO put initialization into a function
-			if(initializationType == "UniformRandom"):
-				self.weights[0] = numpy.random.uniform(-0.01, +0.01, (lastFeatureMapSize, numberOfOutPut))
-				self.weights[0] = self.weights[0].astype(dtype=numpy.float128)
-				self.biases[0] = numpy.random.uniform(-0.01, +0.01, (numberOfOutPut))
-				self.biases[0] = self.biases[0].astype(dtype=numpy.float128)
-			else:
-				raise Exception("Unhandled initialization type: " + str(initializationType))
+			self.weights[0] = numpy.random.uniform(-0.01, +0.01, (lastFeatureMapSize, numberOfOutPut))
+			self.weights[0] = self.weights[0].astype(dtype=numpy.float128)
+			self.biases[0] = numpy.random.uniform(-0.01, +0.01, (numberOfOutPut))
+			self.biases[0] = self.biases[0].astype(dtype=numpy.float128)
 		else:
 			raise Exception("Unhandled layer type: " + str(layerType))
+
+	'''
+	'' TODO DOC
+	'''
+	def xavierInitialization(self, weightSize):
+		
