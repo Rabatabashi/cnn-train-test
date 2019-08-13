@@ -1,5 +1,5 @@
 # CNNTrainingFromScratch
-The project created for to understand better that how a simple convolutional neural network works. In this project we doesn't use any training framework like TensorFlow or Caffe, only use numpy for the computations. You can test an MNIST training with the main.py.
+The project created for to understand better that how a simple convolutional neural network works. In this project we doesn't use any training framework like TensorFlow or Caffe, only use numpy for the computations. You can test an MNIST training with the "main" Python script.
 
 The repository MANIFEST:
  - **resources**: contains all the resource files
@@ -8,7 +8,14 @@ The repository MANIFEST:
  - **scripts/tools**: helper scripts, like Python virtualenv creator
  - **scripts/train**: the CNN classes, and main entry point scripts
 
-## Details
+Used datase:
+
+We tested and used the MNIST dataset. You can get the dataset from: http://yann.lecun.com/exdb/mnist/index.html. We also added this dataset into the **resource/dataset/MNIST** folder to test easily the training procedure.
+
+**MNIST dataset Terms of Use**:
+Yann LeCun (Courant Institute, NYU) and Corinna Cortes (Google Labs, New York) hold the copyright of MNIST dataset, which is a derivative work from original NIST datasets. MNIST dataset is made available under the terms of the Creative Commons Attribution-Share Alike 3.0 license.
+
+## CNN Details
 TODO brief about the CNN...
 
 Changeable nerual network architecture parts:
