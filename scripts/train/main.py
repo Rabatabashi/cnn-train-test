@@ -2,7 +2,7 @@
 
 # Loads the mnist images and labels and trains a fully connected neural network with multiple layers.
 #
-# @author Nagy "rabatabashi" Marton
+# @author Nagy Marton
 # @author Kishazi "janohhank" Janos
 
 # This module provides a portable way of using operating system dependent functionality.
@@ -40,7 +40,7 @@ print("[" + __file__ + "]" + "[INFO]" + " Loaded evaluation images count:",numbe
 
 print("[" + __file__ + "]" + "[INFO]" + " Initializing CNN class.")
 # Weights and biases initialization method type. At now only the "UniformRandom" is allowed.
-initializationType = "UniformRandom"
+initializationType = "Orthogonal"
 
 # Describe the layers type and count in a list. The list element can be "Convolution" or "FullyConnected".
 #	* A convolutional layer contains N (count) x 3D convolutional kernels (FH, FW, C) which works on their 3D input activation (H, W, C).
