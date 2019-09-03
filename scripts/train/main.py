@@ -40,7 +40,7 @@ print("[" + __file__ + "]" + "[INFO]" + " Loaded evaluation images count:",numbe
 
 print("[" + __file__ + "]" + "[INFO]" + " Initializing CNN class.")
 # Weights and biases initialization method type. At now only the "UniformRandom" is allowed.
-initializationType = "Orthogonal"
+initializationType = "xavierUniform"
 
 # Describe the layers type and count in a list. The list element can be "Convolution" or "FullyConnected".
 #	* A convolutional layer contains N (count) x 3D convolutional kernels (FH, FW, C) which works on their 3D input activation (H, W, C).
@@ -50,12 +50,12 @@ layerTypeList = ["Convolution", "Convolution", "FullyConnected"]
 
 # Describe the activation function types for each layer in a list. The list element can be "sigmoid", "linear", "relu", "softmax".
 # NOTE: The "softmax" derivate function is not same with the literature. It is not reliable. Avoid to use it yet.
-activationTypeList = ["sigmoid", "sigmoid", "sigmoid"]
+activationTypeList = ["relu", "sigmoid", "softmax"]
 
 # Describe convolutional layer patterns [N, H, W, C], [count, height, width, channels] of kernels.
 # Describe fully connected layer pattern [K, C], [all pixels of previous layer, output count] of kernels.
 # WARNING: The Ni and Ci must be same between two consecutive convolutional layers.
-weightSizeList = [[10, 3, 3, 1], [10, 3, 3, 10], [10*7*7, 10]]
+weightSizeList = [[20, 5, 5, 1], [20, 3, 3, 20], [20*7*7, 10]]
 
 # Initialization of a network.
 cnn = CNN.CNN(initializationType, layerTypeList, activationTypeList, weightSizeList)

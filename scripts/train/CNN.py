@@ -321,14 +321,15 @@ class CNN:
 			currTarget = target[img]
 			currentPrediction = predictions[img]
 
-			loss = self.lossFunction(currentPrediction, currTarget)
+			#loss is the lossVector (partial derivates of loss depending on each prediction of CNN)
+			#sumOfLoss is the loss of prediction (sum up each partial loss)
+			#loss, sumOfLoss = self.lossFunction(currentPrediction, currTarget)
+			loss, sumOfLoss = self.binaryCrossEntropyLossFunction(currentPrediction, currTarget)
 
-			print("[" + __file__ + "]" + "[INFO]" + " Current loss is: ",loss)
+			print("[" + __file__ + "]" + "[INFO]" + " Current loss is: ",sumOfLoss)
 
 			# The deltas is the error for each layer (dE/dZ).
 			deltas = [None] * numberOfLayers
-			# TODO why -1 is the layerID?
-			deltas[-1] = (loss)*(self.doDerivateOfActivationFunctionOnLayer((cacheList[-1]["Z"]), -1))
 
 			dWImg = [None] * numberOfLayers
 			dBImg = [None] * numberOfLayers
@@ -353,7 +354,10 @@ class CNN:
 					dBImg[layerID] = dBLayer
 				elif(layerType == "FullyConnected"):
 					if(layerID == (numberOfLayers - 1)):
-						startDelta = (loss)*(self.doDerivateOfActivationFunctionOnLayer((cacheList[layerID]["Z"]), layerID))
+						if(self.layers[layerID].activationType == "softmax"):
+							startDelta = numpy.matmul((loss), (self.doDerivateOfActivationFunctionOnLayer((cacheList[layerID]["Z"]), layerID)))
+						else:
+							startDelta = numpy.multiply((loss), (self.doDerivateOfActivationFunctionOnLayer((cacheList[layerID]["Z"]), layerID)))
 						dXLayer, dWLayer, dBLayer = self.backwardFullyConnected(layerID, startDelta, cacheList[layerID])
 						# dX and the derivates of the nonlinearity have same shapes.
 						deltas[layerID] = dXLayer
@@ -366,7 +370,7 @@ class CNN:
 				else:
 					raise Exception("Unhandled layer type: " + str(layerType))
 
-			totalLoss += loss
+			totalLoss += sumOfLoss
 			if img == 0:
 				dWAll = dWImg
 				dBAll = dBImg
@@ -561,9 +565,36 @@ class CNN:
 		print("[" + __file__ + "]" + "[INFO]" + " CNN output vector is: ",output)
 		print("[" + __file__ + "]" + "[INFO]" + " Target vector is: ",targetVector)
 
-		loss = numpy.sum(numpy.absolute(numpy.subtract(output, targetVector)))
+		loss = numpy.absolute(numpy.subtract(output, targetVector))
 
-		return loss
+		sumOfLoss = numpy.sum(loss)
+
+		return loss, sumOfLoss
+
+	'''
+	'' Computes the absolute value of loss
+	'' @param output, the neural network output.
+	'' @param target, the expected output.
+	'''
+	def binaryCrossEntropyLossFunction(self, output, target):
+		#number of classes
+		N = len(output)
+		
+		# Target is a scalar betweeen 0 and 9. We transfrom this scalar into a binary vector with 10 elements.
+		targetVector = numpy.zeros(N, dtype=numpy.float128)
+		targetVector[target-1] = 1.0
+
+		print("[" + __file__ + "]" + "[INFO]" + " CNN output vector is: ",output)
+		print("[" + __file__ + "]" + "[INFO]" + " Target vector is: ",targetVector)
+
+		loss = [0 for x in range(N)]
+		for i in range(N):
+			loss[i] = -(1 / N) * ((targetVector[i] * numpy.log(output[i])) + ((1-targetVector[i]) * numpy.log(1 - output[i])))
+
+		sumOfLoss = numpy.sum(loss)
+
+		return loss, sumOfLoss
+
 
 	'''
 	'' Updates the weights and biases depending on current learning rate and determined dW and dB.
@@ -578,6 +609,7 @@ class CNN:
 			for kernelIdx in range(kernelCounts):
 				self.layers[layerID].weights[kernelIdx] = numpy.subtract(self.layers[layerID].weights[kernelIdx], (lr * dW[layerID][kernelIdx]))
 				self.layers[layerID].biases[kernelIdx] = numpy.subtract(self.layers[layerID].biases[kernelIdx], (lr * dB[layerID][kernelIdx]))
+
 
 	'''
 	'' Trains the initialized neural network, updates the weights and biases of the layers.

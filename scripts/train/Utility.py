@@ -54,7 +54,21 @@ class Utility:
 				return y
 			return relu_diff
 		elif(activationFunctionType == "softmax"):
-			softmax = Utility.getActivationFunction('softmax')
-			return lambda x :softmax(x)*(1-softmax(x))
+			def gradSoftMax(x):
+				softmax = Utility.getActivationFunction('softmax')
+
+				y = numpy.copy(x)
+				length = len(y)
+
+				gradSM = numpy.zeros((length, length))
+
+				for i in range(length):
+					for j in range(length):
+						if i == j:
+							gradSM[i, j] = softmax(y[i])*(1-softmax(y[j]))
+						else:
+							gradSM[i, j] = softmax(y[i])*(-softmax(y[j]))
+				return gradSM
+			return gradSoftMax
 		else:
 			raise Exception("Unhandled activation function type: " + str(activationFunctionType))
